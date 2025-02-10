@@ -14,6 +14,8 @@ const { connection } = require('../db');
  *   post:
  *     summary: Enregistrer une session de jeu
  *     tags: [GameSessions]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -42,7 +44,10 @@ const { connection } = require('../db');
  *         description: Erreur interne du serveur
  */
 router.post('/', verifyJWT, async (req, res) => {
+	console.log("Requête POST à /api/game-sessions")
     const { game_name, player1_id, player2_id, winner_id, result, session_id } = req.body;
+	const userId = req.user.userId; // Récupérer l'ID utilisateur à partir du JWT
+    console.log("USER ID :",userId);
 
     // Validation des données requises
     if (!game_name || typeof player1_id !== 'number' || !result || !session_id) {
@@ -60,6 +65,7 @@ router.post('/', verifyJWT, async (req, res) => {
             console.error('Erreur lors de l\'enregistrement de la session de jeu :', err.message);
             return res.status(500).json({ error: 'Erreur interne du serveur.' });
         }
+		console.log("Params :", params);
         res.status(201).json({
             message: 'Session de jeu enregistrée avec succès.',
             gameSessionId: results.insertId,

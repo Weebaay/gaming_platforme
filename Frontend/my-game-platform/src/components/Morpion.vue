@@ -1,5 +1,6 @@
 <template>
     <div class="morpion">
+        <UserProfile />
         <h1>Morpion Games 2.0</h1>
         <div v-if="!gameStarted">
             <h2>Choisissez un mode de jeu</h2>
@@ -19,10 +20,10 @@
             </div>
         </div>
 
-		<div v-else>
-			<p v-if="!winner && !isMultiplayer">Joueur actuel : {{ currentPlayer }}</p>
-			<p v-else-if="!winner && isMultiplayer">Tour du Joueur : {{ currentPlayer }}</p>
-			<p v-else>{{ winner }}</p>
+        <div v-else>
+            <p v-if="!winner && !isMultiplayer">Joueur actuel : {{ currentPlayer }}</p>
+            <p v-else-if="!winner && isMultiplayer">Tour du Joueur : {{ currentPlayer }}</p>
+            <p v-else>{{ winner }}</p>
             <div class="grid">
                 <div v-for="(cell, index) in grid" :key="index" class="cell" :class="{ taken: cell }"
                     @click="!cell && makeMove(index)">
@@ -37,9 +38,13 @@
 <script>
 import { ref, reactive, onUnmounted, onMounted } from "vue";
 import api from "../services/api";
+import UserProfile from './UserProfile.vue';
 
 export default {
     name: "MorpionGame2",
+    components: {
+        UserProfile,
+    },
     setup() {
         const grid = reactive(Array(9).fill(""));
         const currentPlayer = ref("X");
@@ -56,6 +61,9 @@ export default {
         const player2Id = ref(2);
         const IA_ID = 0; // ID fictif pour l'IA
         const playerSymbol = ref("X");
+        const gameWon = ref(0);
+        const gamesLost = ref(0);
+        const gamesDrawn = ref(0);
         let sse = null;
 
         onMounted(() => {
@@ -63,8 +71,9 @@ export default {
             const storedUsername = localStorage.getItem("username");
             if (storedUsername) {
                 currentPlayer.value = storedUsername;
-				console.log("Nom d'utiisateur récuperé : ", currentPlayer.value);
+                console.log("Nom d'utiisateur récuperé : ", currentPlayer.value);
             }
+            loadProgress();
         });
 
         const listenToUpdates = (sessionId) => {
@@ -80,9 +89,17 @@ export default {
                     }
                     if (data.winner) {
                         winner.value = `Le joueur ${data.winner} a gagné !`;
+                        if (data.winner === playerSymbol.value) {
+                            gameWon.value++;
+                        } else {
+                            gamesLost.value++;
+                        }
+                        saveProgress(); // sauvegarde la progression apres une partie
                     }
                     if (data.draw) {
                         winner.value = "Match nul !";
+                        gamesDrawn.value++;
+                        saveProgress();
                     }
                     if (data.currentPlayer && data.currentPlayer !== playerSymbol.value) {
                         currentPlayer.value = data.currentPlayer;
@@ -197,16 +214,26 @@ export default {
                                 ? IA_ID
                                 : player2Id.value;
                             winner.value = winnerId === IA_ID ? "L'IA a gagné !" : `Le joueur ${winnerId} a gagné !`;
+
+                            if (winnerId === player1Id.value) {
+                                gameWon.value++;
+                            } else {
+                                gamesLost.value++;
+                            }
                             const result = 'victoire';
                             // Enregistrement du résultat après que le gagnant est déterminé
                             await saveGameResult("Morpion", result, winnerId);
+                            await saveProgress()
                             return;
                         }
 
                         if (!grid.includes("")) {
                             winner.value = "Match nul !";
+                            gamesDrawn.value++;
+
                             // Enregistrement du résultat en cas d'égalité
                             await saveGameResult("Morpion", "égalité", null);
+                              await saveProgress()
                             return;
                         }
 
@@ -298,6 +325,55 @@ export default {
             );
         };
 
+        const saveProgress = async () => {
+            try {
+                const progressData = {
+                    gameWon: gameWon.value,
+                    gamesLost: gamesLost.value,
+                    gamesDrawn: gamesDrawn.value,
+                };
+
+                await api.post('/progress/save', {
+                    game_id: 1,
+                    progress_data: progressData,
+                });
+
+                console.log('Progression sauvegardée avec succès.');
+            } catch (error) {
+                console.error('Erreur lors de la sauvegarde de la progression :', error);
+            }
+        };
+
+
+        const loadProgress = async () => {
+            try {
+                console.log("Récupération de la progression pour le jeu Morpion (game_id = 1)...");
+                const response = await api.get('/progress/get', {
+                    params: {
+                        game_id: 1, // ID du jeu Morpion
+                    },
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                console.log("Réponse du serveur :", response);
+
+                if (response.data && response.data.progress_data) {
+                    const progressData = response.data.progress_data;
+                    gameWon.value = progressData.gameWon || 0;
+                    gamesLost.value = progressData.gamesLost || 0;
+                    gamesDrawn.value = progressData.gamesDrawn || 0;
+                    // Récupérez d'autres données de progression si nécessaire
+                    console.log('Progression récupérée avec succès.');
+                } else {
+                    console.log('Aucune progression trouvée pour ce jeu.');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération de la progression :', error);
+            }
+        };
+
         // Réinitialiser la partie
         const resetGame = () => {
             if (sse) {
@@ -316,6 +392,10 @@ export default {
             joinCode.value = "";
             winner.value = null;
             playerSymbol.value = isMultiplayer.value ? "X" : player1Id.value;
+            gameWon.value = 0;
+            gamesLost.value = 0;
+            gamesDrawn.value = 0;
+            saveProgress()
         };
 
         onUnmounted(() => {
@@ -341,6 +421,9 @@ export default {
             player1Id,
             player2Id,
             IA_ID,
+            gameWon,
+            gamesLost,
+            gamesDrawn,
         };
     },
 };

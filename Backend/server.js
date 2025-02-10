@@ -76,6 +76,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/game-sessions', gameSessionRoutes);
 app.use('/api/sse', sseRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/progress', require('./routes/progress'));
 
 // Configuration Swagger
 const swaggerOptions = {

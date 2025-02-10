@@ -13,7 +13,6 @@
   import { ref } from 'vue';
   import { useRouter } from 'vue-router';
   import api from '../services/api';
-  import VueCookie from 'vue-router';
   
   export default {
   name: "LoginPage",
@@ -23,13 +22,14 @@
     const password = ref('');
 
     const handleLogin = async () => {
-		console.log("handleLogin() a été appelé !")
+        console.log("handleLogin() a été appelé !")
       try {
         console.log("Tentative de connexion avec :", { username: username.value, password: password.value }); // Log pour déboguer
         const response = await api.post('/users/login', { username: username.value, password: password.value });
-		console.log("Nom d'utilisateur stocké :", username.value);
-		VueCookie.set('token', response.data.token, { expires: '1h', httpOnly: true});
-		alert("Connexion réussie !");
+        console.log("Nom d'utilisateur stocké :", username.value);
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('username', username.value);
+        alert("Connexion réussie !");
         router.push('/home'); // Rediriger vers la page d'accueil
       } catch (error) {
         console.error("Erreur de connexion :", error.response || error); // Log détaillé pour l'erreur

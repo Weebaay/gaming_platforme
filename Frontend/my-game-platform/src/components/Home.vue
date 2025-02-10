@@ -1,5 +1,6 @@
 <template>
     <div class="home">
+      <UserProfile />
       <h1>Bienvenue sur la Plateforme de Jeux</h1>
       <p>Sélectionnez un jeu pour commencer à jouer :</p>
       <ul>
@@ -16,8 +17,13 @@
   </script>
 
   <script>
+  import UserProfile from './UserProfile.vue';
+
   export default {
-  name: "HomePage", // Nouveau nom du composant
+  name: "HomePage",
+  components: {
+    UserProfile,
+  },
 };
 </script>
   

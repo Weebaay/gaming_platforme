@@ -1,5 +1,6 @@
 <template>
     <div class="jeu-des-des">
+      <UserProfile />
       <h1>Jeu des Dés</h1>
   
       <!-- Mode de jeu -->
@@ -42,11 +43,12 @@
         <p>Joueur 1 : {{ scores.player }}</p>
         <p>{{ mode === 'local' ? 'Joueur 2' : 'IA' }} : {{ scores.opponent }}</p>
   
-        <!-- Historique -->
-        <h2>Historique des parties</h2>
-        <ul>
-          <li v-for="(entry, index) in history" :key="index">{{ entry }}</li>
-        </ul>
+        <!-- Statistiques -->
+        <h2>Statistiques</h2>
+        <p>Nombre de lancers : {{ nombreLancers }}</p>
+        <p>Victoires contre l'IA : {{ victoiresIA }}</p>
+        <p>Victoires en mode local : {{ victoiresLocal }}</p>
+        <p>Victoires consécutives : {{ victoiresConsecutives }}</p>
   
         <!-- Recommencer -->
         <button @click="resetGame">Recommencer</button>
@@ -55,168 +57,235 @@
   </template>
   
   <script>
-  import { ref, reactive } from "vue";
-import api from "../services/api";
-
-export default {
-  name: "JeuDesDes",
-  setup() {
-    const gameStarted = ref(false);
-    const mode = ref(""); // "ia" ou "local"
-    const turn = ref("player"); // "player" ou "opponent"
-    const rolling = ref(false); // Si le dé est en cours de roulement
-    const playerRoll = ref(null); // Résultat pour Joueur 1
-    const opponentRoll = ref(null); // Résultat pour Joueur 2 ou l'IA
-    const scores = reactive({ player: 0, opponent: 0 }); // Scores des joueurs
-    const history = reactive([]); // Historique des parties
-    const winner = ref(""); // Résultat de la manche
-    const dieFaces = [
-      "/images/die1.png",
-      "/images/die2.png",
-      "/images/die3.png",
-      "/images/die4.png",
-      "/images/die5.png",
-      "/images/die6.png",
-    ];
-    const playerDieImage = ref(""); // Image actuelle pour Joueur 1
-    const opponentDieImage = ref(""); // Image actuelle pour Joueur 2 ou l'IA
+  import { ref, reactive, onMounted } from "vue";
+  import api from "../services/api";
+  import UserProfile from './UserProfile.vue';
+  
+  export default {
+    name: "JeuDesDes",
+    components: {
+      UserProfile,
+    },
+    setup() {
+      // Déclaration des variables réactives pour les statistiques
+      const nombreLancers = ref(0);
+      const victoiresIA = ref(0);
+      const victoiresLocal = ref(0);
+      const victoiresConsecutives = ref(0);
+  
+      // Autres variables réactives
+      const gameStarted = ref(false);
+      const mode = ref(""); // "ia" ou "local"
+      const turn = ref("player"); // "player" ou "opponent"
+      const rolling = ref(false); // Si le dé est en cours de roulement
+      const playerRoll = ref(null); // Résultat pour Joueur 1
+      const opponentRoll = ref(null); // Résultat pour Joueur 2 ou l'IA
+      const scores = reactive({ player: 0, opponent: 0 }); // Scores des joueurs
+      const winner = ref(""); // Résultat de la manche
       const player1Id = ref(1);
-      const IA_ID = 0;
-
-      // Fonction pour enregistrer le résultat de la partie
-    const saveGameResult = async (result,winnerId) => {
-        try {
-           console.log("Envoie des résultats :", {
-              game_name: "JeuDesDes",
-              player1_id: player1Id.value,
+      const player2Id = ref(0);
+      const IA_ID = null;
+  
+      const dieFaces = [
+        "/images/die1.png",
+        "/images/die2.png",
+        "/images/die3.png",
+        "/images/die4.png",
+        "/images/die5.png",
+        "/images/die6.png",
+      ];
+      const playerDieImage = ref(""); // Image actuelle pour Joueur 1
+      const opponentDieImage = ref(""); // Image actuelle pour Joueur 2 ou l'IA
+  
+      onMounted(() => {
+        loadProgress(); // Charger la progression au montage
+      });
+  
+        // Fonction pour enregistrer le résultat de la partie
+      const saveGameResult = async (result,winnerId) => {
+          try {
+             console.log("Envoie des résultats :", {
+               game_name: "JeuDesDes",
+               player1_id: player1Id.value,
                player2_id: IA_ID,
-             winner_id: winnerId,
-              result,
-            });
-
-          const response = await api.post("/game-sessions", {
-           game_name: "JeuDesDes",
+               winner_id: winnerId,
+                result,
+              });
+  
+            const response = await api.post("/game-sessions", {
+             game_name: "JeuDesDes",
               player1_id: player1Id.value,
-           player2_id: IA_ID,
-            winner_id: winnerId,
-            result: result,
+              player2_id: IA_ID,
+              winner_id: winnerId,
+              result: result,
+            });
+             console.log("Partie enregistrée avec succès:", response.data);
+          } catch (error) {
+            console.error("Erreur lors de l'enregistrement de la partie:", error);
+          }
+        };
+  
+      // Fonction pour sauvegarder la progression du joueur
+      const saveProgress = async () => {
+        try {
+          const progressData = {
+            nombreLancers: nombreLancers.value,
+            victoiresIA: victoiresIA.value,
+            victoiresLocal: victoiresLocal.value,
+            victoiresConsecutives: victoiresConsecutives.value,
+          };
+  
+          const gameId = 29;
+          await api.post('/progress/save', {
+            game_id: gameId,
+            progress_data: progressData,
           });
-           console.log("Partie enregistrée avec succès:", response.data);
+  
+          console.log('Progression sauvegardée avec succès.');
         } catch (error) {
-          console.error("Erreur lors de l'enregistrement de la partie:", error);
+          console.error('Erreur lors de la sauvegarde de la progression :', error);
         }
       };
-
-    const startGame = (selectedMode) => {
-      mode.value = selectedMode;
-      gameStarted.value = true;
-      resetGame();
-    };
-
-    const rollDie = async (player) => {
-      rolling.value = true;
-
-      // Animation du dé
-      const interval = setInterval(() => {
+  
+      // Fonction pour charger la progression du joueur
+      const loadProgress = async () => {
+        try {
+          const gameId = 29;
+          const response = await api.get('/progress/get', {
+            params: {
+              game_id: gameId,
+            },
+          });
+  
+          if (response.data && response.data.progress_data) {
+            const progressData = response.data.progress_data;
+            nombreLancers.value = progressData.nombreLancers || 0;
+            victoiresIA.value = progressData.victoiresIA || 0;
+            victoiresLocal.value = progressData.victoiresLocal || 0;
+            victoiresConsecutives.value = progressData.victoiresConsecutives || 0;
+            console.log('Progression récupérée avec succès.');
+          } else {
+            console.log('Aucune progression trouvée pour ce jeu.');
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération de la progression :', error);
+        }
+      };
+  
+      // Démarre une nouvelle partie
+      const startGame = (selectedMode) => {
+        mode.value = selectedMode;
+        gameStarted.value = true;
+        resetGame(); // Réinitialiser les statistiques au début d'une nouvelle partie
+      };
+  
+      // Lance le dé pour un joueur
+      const rollDie = async (player) => {
+        rolling.value = true;
+        nombreLancers.value++; // Incrémenter le nombre de lancers
+  
+        // Animation du dé
+        const interval = setInterval(() => {
+          if (player === "player") {
+            playerDieImage.value = dieFaces[Math.floor(Math.random() * 6)];
+          } else {
+            opponentDieImage.value = dieFaces[Math.floor(Math.random() * 6)];
+          }
+        }, 100);
+  
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Simule le roulement
+  
+        clearInterval(interval); // Arrête l'animation
+  
+        // Calculer le résultat
+        const roll = Math.floor(Math.random() * 6) + 1;
         if (player === "player") {
-          playerDieImage.value = dieFaces[Math.floor(Math.random() * 6)];
+          playerRoll.value = roll;
+          playerDieImage.value = dieFaces[roll - 1];
+          if (mode.value === "local") {
+            turn.value = "opponent"; // Passe au Joueur 2
+          } else {
+            setTimeout(() => rollDie("opponent"), 2000); // L'IA joue automatiquement
+          }
         } else {
-          opponentDieImage.value = dieFaces[Math.floor(Math.random() * 6)];
+          opponentRoll.value = roll;
+          opponentDieImage.value = dieFaces[roll - 1];
+          determineWinner(); // Détermine le gagnant après le tour de l'opponent
         }
-      }, 100);
-
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simule le roulement
-
-      clearInterval(interval); // Arrête l'animation
-
-      // Calculer le résultat
-      const roll = Math.floor(Math.random() * 6) + 1;
-      if (player === "player") {
-        playerRoll.value = roll;
-        playerDieImage.value = dieFaces[roll - 1];
-        if (mode.value === "local") {
-          turn.value = "opponent"; // Passe au Joueur 2
-        } else {
-          setTimeout(() => rollDie("opponent"), 2000); // L'IA joue automatiquement
-        }
-      } else {
-        opponentRoll.value = roll;
-        opponentDieImage.value = dieFaces[roll - 1];
-        determineWinner(); // Détermine le gagnant après le tour de l'opponent
-      }
-      rolling.value = false;
-    };
-
-     const determineWinner = () => {
-            let result;
-             let winnerId = null;
-           if (playerRoll.value > opponentRoll.value) {
-                 winner.value = "Joueur 1 gagne !";
-                scores.player++;
-             result = 'victoire';
-                 winnerId = player1Id.value;
-        } else if (playerRoll.value < opponentRoll.value) {
-                winner.value = mode.value === "local" ? "Joueur 2 gagne !" : "L'IA gagne !";
-                scores.opponent++;
-                 result = 'défaite';
-                 winnerId = IA_ID;
-            } else {
-                 winner.value = "Égalité !";
-                result = 'égalité';
-            }
-          saveGameResult(result,winnerId);
-       history.unshift(winner.value);
-      if (history.length > 10) history.pop();
-
-         // Préparer le prochain tour
-            if (mode.value === "local") {
-            setTimeout(() => resetTurnForLocal(), 2000);
-        }
-    };
-    
-    const resetTurnForLocal = () => {
-         playerRoll.value = null;
-            opponentRoll.value = null;
-            playerDieImage.value = "";
-           opponentDieImage.value = "";
-        winner.value = "";
-      turn.value = "player";
-    };
-
-
-    const resetGame = () => {
+        rolling.value = false;
+        saveProgress(); // Sauvegarder la progression après chaque lancer
+      };
+  
+       const determineWinner = () => {
+              let result;
+               let winnerId = null;
+             if (playerRoll.value > opponentRoll.value) {
+                  winner.value = "Joueur 1 gagne !";
+                  scores.player++;
+                  result = 'victoire';
+                  winnerId = player1Id.value;
+                  victoiresConsecutives.value++;
+          } else if (playerRoll.value < opponentRoll.value) {
+                  winner.value = mode.value === "local" ? "Joueur 2 gagne !" : "L'IA gagne !";
+                  scores.opponent++;
+                   result = 'défaite';
+                   winnerId = IA_ID;
+                   if (mode.value === 'ia') {
+                      victoiresIA.value++;
+                   }
+                   victoiresConsecutives.value = 0;
+              } else {
+                  winner.value = "Égalité !";
+                  result = 'égalité';
+                  victoiresConsecutives.value = 0;
+              }
+              if (mode.value === "local" && playerRoll.value > opponentRoll.value) {
+                  victoiresLocal.value++;
+                }
+            saveGameResult(result,winnerId);
+          };
+  
+      // Réinitialise la partie
+      const resetGame = () => {
         playerRoll.value = null;
         opponentRoll.value = null;
         playerDieImage.value = "";
         opponentDieImage.value = "";
-      winner.value = "";
-      turn.value = "player";
-      scores.player = 0;
-      scores.opponent = 0;
-      history.length = 0;
-    };
-
-    return {
-      gameStarted,
-      mode,
-      turn,
-      rolling,
-      playerRoll,
-      opponentRoll,
-      scores,
-      history,
-      winner,
-      dieFaces,
-      playerDieImage,
-      opponentDieImage,
-        player1Id,
-        IA_ID,
-      startGame,
-      rollDie,
-      resetGame,
-    };
-  },
-};
+        winner.value = "";
+        turn.value = "player";
+        scores.player = 0;
+        scores.opponent = 0;
+        nombreLancers.value = 0;
+        victoiresIA.value = 0;
+        victoiresLocal.value = 0;
+        victoiresConsecutives.value = 0;
+        saveProgress(); // Sauvegarder la progression après la réinitialisation
+      };
+  
+      return {
+        gameStarted,
+        mode,
+        turn,
+        rolling,
+        playerRoll,
+        opponentRoll,
+        scores,
+        winner,
+        dieFaces,
+        playerDieImage,
+        opponentDieImage,
+        nombreLancers,
+        victoiresIA,
+        victoiresLocal,
+        victoiresConsecutives,
+          player1Id,
+          IA_ID,
+        startGame,
+        rollDie,
+        resetGame,
+      };
+    },
+  };
   </script>
   
   <style scoped>
@@ -245,4 +314,3 @@ export default {
     }
   }
   </style>
-  

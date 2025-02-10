@@ -3,7 +3,9 @@
  * @description Configure le proxy pour rediriger les requêtes API vers le backend, sans gérer les WebSockets.
  */
 
-module.exports = {
+const { defineConfig } = require('@vue/cli-service');
+module.exports = defineConfig({
+	transpileDependencies: true,
 	devServer: {
 	  proxy: {
 		'/api': {
@@ -13,5 +15,5 @@ module.exports = {
 		},
 	  },
 	},
-  };
+  });
   

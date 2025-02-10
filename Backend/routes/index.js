@@ -19,5 +19,6 @@ const router = express.Router();
 router.use('/games', require('./games'));
 router.use('/users', require('./users'));
 router.use('/sse', require('./sse'));
+router.use('/progress', require('./progress'));
 
 module.exports = router;

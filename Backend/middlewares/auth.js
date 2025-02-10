@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const verifyJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
+	console.log("authHeader :", authHeader);
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         console.log(`[ERROR] Token manquant ou format invalide`);
         return res.status(401).json({ message: 'Token manquant ou invalide' });
