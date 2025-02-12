@@ -1,6 +1,7 @@
 <template>
     <div class="jeu-des-des">
       <UserProfile />
+      <p>User ID: {{ userId }}</p>
       <h1>Jeu des Dés</h1>
   
       <!-- Mode de jeu -->
@@ -57,9 +58,10 @@
   </template>
   
   <script>
-  import { ref, reactive, onMounted } from "vue";
+  import { ref, reactive, onMounted, computed } from "vue";
   import api from "../services/api";
   import UserProfile from './UserProfile.vue';
+  import { decodeJWT } from '@/util/utils';
   
   export default {
     name: "JeuDesDes",
@@ -83,8 +85,9 @@
       const scores = reactive({ player: 0, opponent: 0 }); // Scores des joueurs
       const winner = ref(""); // Résultat de la manche
       const player1Id = ref(1);
+      // eslint-disable-next-line 
       const player2Id = ref(0);
-      const IA_ID = null;
+      const IA_ID = 0;
   
       const dieFaces = [
         "/images/die1.png",
@@ -96,6 +99,17 @@
       ];
       const playerDieImage = ref(""); // Image actuelle pour Joueur 1
       const opponentDieImage = ref(""); // Image actuelle pour Joueur 2 ou l'IA
+
+      const userId = computed(() => { // Ajouter la propriété calculée userId
+      const token = localStorage.getItem('token');
+      if (token) {
+        const decodedToken = decodeJWT(token);
+        if (decodedToken && decodedToken.userId) {
+          return decodedToken.userId;
+        }
+      }
+      return null;
+    });
   
       onMounted(() => {
         loadProgress(); // Charger la progression au montage
@@ -103,21 +117,24 @@
   
         // Fonction pour enregistrer le résultat de la partie
       const saveGameResult = async (result,winnerId) => {
+          const sessionId = localStorage.getItem("sessionId");
           try {
              console.log("Envoie des résultats :", {
                game_name: "JeuDesDes",
                player1_id: player1Id.value,
-               player2_id: IA_ID,
+               player2_id: mode.value === "local" ? player2Id.value : IA_ID,
                winner_id: winnerId,
-                result,
+               result,
+               session_id: sessionId,
               });
   
             const response = await api.post("/game-sessions", {
              game_name: "JeuDesDes",
               player1_id: player1Id.value,
-              player2_id: IA_ID,
+              player2_id: mode.value === "local" ? player2Id.value : IA_ID,
               winner_id: winnerId,
               result: result,
+              session_id: sessionId,
             });
              console.log("Partie enregistrée avec succès:", response.data);
           } catch (error) {
@@ -137,6 +154,7 @@
   
           const gameId = 29;
           await api.post('/progress/save', {
+            user_id: userId.value,
             game_id: gameId,
             progress_data: progressData,
           });
@@ -153,6 +171,7 @@
           const gameId = 29;
           const response = await api.get('/progress/get', {
             params: {
+              user_id: userId.value,
               game_id: gameId,
             },
           });
@@ -278,11 +297,12 @@
         victoiresIA,
         victoiresLocal,
         victoiresConsecutives,
-          player1Id,
-          IA_ID,
+        player1Id,
+        IA_ID,
         startGame,
         rollDie,
         resetGame,
+        userId,
       };
     },
   };

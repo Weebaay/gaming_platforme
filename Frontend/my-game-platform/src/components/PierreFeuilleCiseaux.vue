@@ -1,6 +1,8 @@
 <template>
     <div class="pierre-feuille-ciseaux">
         <UserProfile />
+        <p>User ID: {{ userId }}</p>
+
         <h1>Pierre Feuille Ciseaux</h1>
 
         <!-- Boutons pour jouer -->
@@ -65,9 +67,10 @@
 </template>
   
 <script>
-import {  ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import api from "../services/api";
 import UserProfile from './UserProfile.vue';
+import { decodeJWT } from '@/util/utils';
 
 export default {
   name: "PierreFeuilleCiseaux",
@@ -87,6 +90,17 @@ export default {
     const resultatPartie = ref("");
     const resultatVisible = ref(false);
     const winnerId = ref(null);
+
+    const userId =  computed(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const decodedToken = decodeJWT(token);
+            if (decodedToken && decodedToken.userId) {
+                return decodedToken.userId;
+            }
+        }
+        return null;
+    });
 
     // génere un sessionID
     const sessionId = 'S' + Math.random().toString(36).substring(2,15);
@@ -130,6 +144,7 @@ export default {
 
                 const gameId = 28;
                 await api.post('/progress/save', {
+                    user_id: userId.value,
                     game_id: gameId,
                     progress_data: progressData,
                 });
@@ -142,9 +157,10 @@ export default {
 
         const loadProgress = async () => {
             try {
-                const gameId = 2; // ID du jeu Pierre-Feuille-Ciseaux
+                const gameId = 28; // ID du jeu Pierre-Feuille-Ciseaux
                 const response = await api.get('/progress/get', {
                     params: {
+                        user_id: userId.value,
                         game_id: gameId,
                     },
                 });
@@ -239,6 +255,7 @@ export default {
       IA_ID,
       mettreScoreZero,
       jouer,
+      userId,
     };
   },
 };

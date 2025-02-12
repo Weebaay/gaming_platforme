@@ -1,6 +1,7 @@
 <template>
     <div class="morpion">
         <UserProfile />
+        <p>User ID: {{ userId }}</p>
         <h1>Morpion Games 2.0</h1>
         <div v-if="!gameStarted">
             <h2>Choisissez un mode de jeu</h2>
@@ -36,9 +37,10 @@
 </template>
 
 <script>
-import { ref, reactive, onUnmounted, onMounted } from "vue";
+import { ref, reactive, computed, onUnmounted, onMounted } from "vue";
 import api from "../services/api";
 import UserProfile from './UserProfile.vue';
+import { decodeJWT } from '@/util/utils';
 
 export default {
     name: "MorpionGame2",
@@ -65,6 +67,17 @@ export default {
         const gamesLost = ref(0);
         const gamesDrawn = ref(0);
         let sse = null;
+
+        const userId = computed(() => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                const decodedToken = decodeJWT(token);
+                if (decodedToken && decodedToken.userId) {
+                    return decodedToken.userId;
+                }
+            }
+            return null;
+        });
 
         onMounted(() => {
             // recupere le nom d'utilisateur depuis le localStorage lors du montage de composant
@@ -334,6 +347,7 @@ export default {
                 };
 
                 await api.post('/progress/save', {
+                    user_id: userId.value,
                     game_id: 1,
                     progress_data: progressData,
                 });
@@ -350,6 +364,7 @@ export default {
                 console.log("Récupération de la progression pour le jeu Morpion (game_id = 1)...");
                 const response = await api.get('/progress/get', {
                     params: {
+                        user_id: userId.value,
                         game_id: 1, // ID du jeu Morpion
                     },
                     headers: {
@@ -424,6 +439,7 @@ export default {
             gameWon,
             gamesLost,
             gamesDrawn,
+            userId
         };
     },
 };
