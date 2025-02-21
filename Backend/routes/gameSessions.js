@@ -66,11 +66,43 @@ router.post('/', verifyJWT, async (req, res) => {
             return res.status(500).json({ error: 'Erreur interne du serveur.' });
         }
 		console.log("Params :", params);
+
+		// Mise a jours des statistique des joueurs
+		if (result === 'égalité') {
+            // Égalité
+            updateStats(player1_id, 'egalites');
+            if (player2_id) {
+                updateStats(player2_id, 'egalites');
+            }
+        } else if (result === 'victoire') {
+            // Victoire
+            updateStats(winner_id, 'victoires');
+			updateStats(player1_id, 'defaites');
+        } else if (result === 'défaite') {
+			// Défaite
+			updateStats(player1_id, 'defaites');
+		}
         res.status(201).json({
             message: 'Session de jeu enregistrée avec succès.',
             gameSessionId: results.insertId,
         });
     });
+
+	// Fonction pour mettre à jour les statistiques d'un joueur
+    function updateStats(playerId, statType) {
+        const updateQuery = `
+            UPDATE users
+            SET ${statType} = ${statType} + 1
+            WHERE id = ?
+        `;
+        connection.query(updateQuery, [playerId], (err, results) => {
+            if (err) {
+                console.error(`Erreur lors de la mise à jour de la statistique ${statType} pour le joueur ${playerId}:`, err.message);
+            } else {
+                console.log(`Statistique ${statType} mise à jour pour le joueur ${playerId}.`);
+            }
+        });
+    }
 });
 
 /**

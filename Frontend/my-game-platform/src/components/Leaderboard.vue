@@ -1,6 +1,7 @@
 <template>
     <div class="leaderboard">
         <h1>Classement des Joueurs</h1>
+		<button @click="fetchLeaderboard">Actualiser le classement</button>
         <table v-if="leaderboard.length > 0">
             <thead>
             <tr>
@@ -8,18 +9,29 @@
                 <th>Victoires</th>
                 <th>Défaites</th>
                 <th>Égalités</th>
-                 <th>Total</th>
-                 <th>Jeux</th>
+				<th>Morpion</th>
+				<th>PierreFeuilleCiseaux</th>
+				<th>JeuDesDes</th>
             </tr>
             </thead>
             <tbody>
             <tr v-for="(player, index) in leaderboard" :key="index">
                 <td>{{ player.username }}</td>
-                <td>{{ player.victories }}</td>
-                <td>{{ player.defeats }}</td>
-                <td>{{ player.draws }}</td>
-                <td>{{ player.total }}</td>
-               <td>{{ player.game_names }}</td>
+                <td>{{ player.victoires }}</td>
+                <td>{{ player.defaites }}</td>
+                <td>{{ player.egalites }}</td>
+				<td>
+					V: {{ player.morpion_victoires }} / D: {{ player.morpion_defaites }} / E:
+					{{ player.morpion_egalites }}
+				</td>
+				<td>
+					V: {{ player.pfc_victoires }} / D: {{ player.pfc_defaites }} / E:
+					{{ player.pfc_egalites }}
+				</td>
+				<td>
+					V: {{ player.des_victoires }} / D: {{ player.des_defaites }} / E:
+					{{ player.des_egalites }}
+				</td>
             </tr>
             </tbody>
         </table>
@@ -51,6 +63,7 @@ export default {
 
         return {
             leaderboard,
+			fetchLeaderboard
         };
     },
 };
@@ -66,17 +79,17 @@ table {
   margin: 20px auto;
   border-collapse: collapse;
   font-family: sans-serif;
-   border: 1px solid #ddd;
-
+  border: 1px solid #ddd;
 }
 
-th, td {
+th,
+td {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;
 }
 
- th {
-    background-color: #f2f2f2;
+th {
+  background-color: #f2f2f2;
 }
 </style>

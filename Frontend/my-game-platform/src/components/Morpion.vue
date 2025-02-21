@@ -41,6 +41,7 @@ import { ref, reactive, computed, onUnmounted, onMounted } from "vue";
 import api from "../services/api";
 import UserProfile from './UserProfile.vue';
 import { decodeJWT } from '@/util/utils';
+import { io } from 'socket.io-client';
 
 export default {
     name: "MorpionGame2",
@@ -66,7 +67,8 @@ export default {
         const gameWon = ref(0);
         const gamesLost = ref(0);
         const gamesDrawn = ref(0);
-        let sse = null;
+        const socket = ref(null);
+        const sessionID = ref("");
 
         const userId = computed(() => {
             const token = localStorage.getItem('token');
@@ -86,46 +88,38 @@ export default {
                 currentPlayer.value = storedUsername;
                 console.log("Nom d'utiisateur récuperé : ", currentPlayer.value);
             }
-            loadProgress();
-        });
+            if (userId.value) {
+                loadProgress();
+            }
 
-        const listenToUpdates = (sessionId) => {
-            sse = new EventSource(`http://localhost:3000/api/sse/connect?sessionId=${sessionId}`);
+            socket.value = io('http://localhost:3000');
+            socket.value.on('connect', () => {
+                console.log('Connecté au serveur WebSocket avec l\'ID :', socket.value.id);
+            });
 
-            sse.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                console.log("SSE message reçu :", data);
-
-                if (data.sessionId === sessionId) {
+            socket.value.on('disconnect', () => {
+                console.log('Déconnecté du serveur WebSocket');
+            });
+             //  Écoute l'événement 'updateGame'
+            socket.value.on('updateGame', (data) => {
+            console.log('Mise à jour du jeu reçue via WebSocket:', data);
+            //Mettre a jours les informations de jeux
+                if (data.grid) {
                     for (let i = 0; i < 9; i++) {
                         grid[i] = data.grid[i];
                     }
-                    if (data.winner) {
-                        winner.value = `Le joueur ${data.winner} a gagné !`;
-                        if (data.winner === playerSymbol.value) {
-                            gameWon.value++;
-                        } else {
-                            gamesLost.value++;
-                        }
-                        saveProgress(); // sauvegarde la progression apres une partie
-                    }
-                    if (data.draw) {
-                        winner.value = "Match nul !";
-                        gamesDrawn.value++;
-                        saveProgress();
-                    }
-                    if (data.currentPlayer && data.currentPlayer !== playerSymbol.value) {
-                        currentPlayer.value = data.currentPlayer;
-                    }
-
                 }
-            };
-
-            sse.onerror = () => {
-                console.error("Erreur SSE : impossible de se connecter au serveur");
-                sse.close();
-            };
-        };
+                if (data.winner) {
+                    winner.value = `Le joueur ${data.winner} a gagné !`;
+                }
+                if (data.draw) {
+                    winner.value = "Match nul !";
+                }
+                if (data.currentPlayer) {
+                   currentPlayer.value = data.currentPlayer;
+                }
+            });
+        });
 
         const toggleJoinInput = () => {
             showJoinInput.value = !showJoinInput.value;
@@ -140,27 +134,22 @@ export default {
                 aiEnabled.value = true; // Activer le mode IA
                 player2Id.value = IA_ID;
                 const sessionId = 'S' + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('sessionId', sessionId);
+                sessionID.value = sessionId;
                 console.log("session ID stocker pour le mode solo :", sessionId);
             } else if (mode === "private") {
                 isMultiplayer.value = true;
                 isHost.value = true;
                 playerSymbol.value = "X"; // Premier Joueur commence
-                try {
-                    const response = await api.post("/sessions/create");
-                    gameCode.value = response.data.sessionId;
-                    localStorage.setItem('sessionId', gameCode.value);
-                    console.log("Session ID stocké :", gameCode.value);
-                    listenToUpdates(gameCode.value);
-                    alert(`Code de la partie : ${gameCode.value}`);
-                } catch (error) {
-                    console.error("Erreur lors de la création de la session :", error);
-                    alert("Impossible de créer une partie. Veuillez réessayer.");
-                }
+                socket.value.emit('createSession', (sessionId) => {
+                gameCode.value = sessionId;
+                sessionID.value = gameCode.value;
+                console.log("Session ID stocké :", gameCode.value);
+                alert(`Code de la partie : ${gameCode.value}`);
+            });
             } else if (mode === "free") {
                 freeMode.value = true; // Mode local
                 const sessionsId = 'F' + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('sessionsId', sessionsId);
+                sessionID.value = sessionsId;
                 console.log("session Id stocker pour le mode free :", sessionsId); 
             }
 
@@ -175,23 +164,19 @@ export default {
                 alert("Veuillez entrer un code de partie !");
                 return;
             }
-            try {
-                const response = await api.post("/sessions/join", {
-                    sessionId: joinCode.value,
-                    username: "Player2",
-                });
-                if (response.data.success) {
-                    gameStarted.value = true;
-                    playerSymbol.value = "O"; // L'invité joue "O"
-                    isMultiplayer.value = true;
-                    isHost.value = false;
-                    listenToUpdates(joinCode.value);
-                    alert("Rejoint avec succès !");
+            
+            socket.value.emit('joinSession', joinCode.value, (response) => {
+                if (response.success) {
+                gameStarted.value = true;
+                playerSymbol.value = "O"; // L'invité joue "O"
+                isMultiplayer.value = true;
+                isHost.value = false;
+                sessionID.value = joinCode.value;
+                alert("Rejoint avec succès !");
+            } else {
+                alert(response.message || "Impossible de rejoindre cette partie.");
                 }
-            } catch (error) {
-                console.error("Erreur lors de la tentative de rejoindre la session :", error);
-                alert("Impossible de rejoindre cette partie. Vérifiez le code ou l'état de la session.");
-            }
+            });
         };
 
         // Gérer un mouvement
@@ -206,34 +191,26 @@ export default {
                     if (isMultiplayer.value) {
                         // En mode multijoueur, envoyer la demande au backend
                         console.log("isHost:", isHost.value, "gameCode:", gameCode.value, "joinCode:", joinCode.value);
-                        const response = await api.post("/sessions/move", {
-                            sessionId: isHost.value ? gameCode.value : joinCode.value,
+                        socket.value.emit('makeMove', { // Emettre un événement WebSocket
+                            sessionId: sessionID.value,
                             index,
                             player: playerSymbol.value,
                         });
 
-                        // Attendre la résolution de la promesse avant de continuer
-                        await response;
-
-                        console.log("Mouvement envoyé au serveur, attente de la mise à jour SSE.");
                     } else {
                         // En mode solo ou local
                         grid[index] = currentPlayer.value;
 
                         if (checkWinner(grid, currentPlayer.value)) {
-                            const winnerId = currentPlayer.value === "X"
-                                ? player1Id.value
-                                : aiEnabled.value
-                                ? IA_ID
-                                : player2Id.value;
+                            let result = currentPlayer.value === "X" ? 'victoire' : 'défaite';
+                            const winnerId = result === 'victoire' ? userId.value : IA_ID;
                             winner.value = winnerId === IA_ID ? "L'IA a gagné !" : `Le joueur ${winnerId} a gagné !`;
 
-                            if (winnerId === player1Id.value) {
+                            if (result === 'victoire') {
                                 gameWon.value++;
                             } else {
                                 gamesLost.value++;
                             }
-                            const result = 'victoire';
                             // Enregistrement du résultat après que le gagnant est déterminé
                             await saveGameResult("Morpion", result, winnerId);
                             await saveProgress()
@@ -280,25 +257,23 @@ export default {
         };
 
         const saveGameResult = async (gameName, result, winnerId) => {
-            const sessionId = localStorage.getItem("sessionId");
-            console.log("Session ID récupéré :", sessionId);
             try {
                 console.log("Envoie des résultat :", {
                     game_name: gameName,
-                    player1_id: player1Id.value,
+                    player1_id: userId.value,
                     player2_id: aiEnabled.value ? IA_ID : player2Id.value,
-                    winner_id: winnerId,
+                    winner_id: aiEnabled.value && winnerId === IA_ID ? IA_ID : winnerId === player1Id.value ? userId.value : winnerId,
                     result,
-                    session_id: sessionId,
+                    session_id: sessionID.value,
                 });
 
                 const response = await api.post("/game-sessions", {
                     game_name: gameName,
-                    player1_id: player1Id.value,
+                    player1_id: userId.value,
                     player2_id: aiEnabled.value ? IA_ID : player2Id.value,
-                    winner_id: winnerId,
+                    winner_id: aiEnabled.value && winnerId === IA_ID ? IA_ID : winnerId === player1Id.value ? userId.value : winnerId,
                     result,
-                    session_id: sessionId,
+                    session_id: sessionID.value,
                 });
 
                 console.log("Réponse du serveur :", response.data);
@@ -391,10 +366,6 @@ export default {
 
         // Réinitialiser la partie
         const resetGame = () => {
-            if (sse) {
-                sse.close();
-                sse = null;
-            }
             grid.fill(""); // Réinitialiser la grille
             currentPlayer.value = "X";
             gameStarted.value = false;
@@ -414,7 +385,9 @@ export default {
         };
 
         onUnmounted(() => {
-            if (sse) sse.close();
+            if (socket.value) {
+                socket.value.disconnect();
+            }
         });
 
         return {
@@ -427,7 +400,6 @@ export default {
             gameCode,
             joinCode,
             winner,
-            listenToUpdates,
             startGame,
             toggleJoinInput,
             joinGame,
@@ -439,7 +411,9 @@ export default {
             gameWon,
             gamesLost,
             gamesDrawn,
-            userId
+            userId,
+            socket,
+            sessionID
         };
     },
 };

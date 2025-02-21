@@ -9,6 +9,17 @@
         <h2>Choisissez un mode de jeu</h2>
         <button @click="startGame('ia')">Jouer contre l'IA</button>
         <button @click="startGame('local')">Mode Local</button>
+		<button @click="startGame('private')">Créer une Partie Privée</button>
+		<button @click="toggleJoinInput">Rejoindre une Partie</button>
+  
+            <div v-if="showJoinInput">
+                <input v-model="joinCode" placeholder="Entrez le code de la partie" />
+                <button @click="joinGame">Rejoindre</button>
+            </div>
+            <div v-if="isHost">
+                <p>Partagez ce code avec votre ami pour qu'il rejoigne :</p>
+                <p class="code">{{ gameCode }}</p>
+            </div>
       </div>
   
       <!-- Partie en cours -->
@@ -85,6 +96,10 @@
       const scores = reactive({ player: 0, opponent: 0 }); // Scores des joueurs
       const winner = ref(""); // Résultat de la manche
       const player1Id = ref(1);
+	  const isHost = ref(false);
+      const showJoinInput = ref(false);
+      const gameCode = ref("");
+      const joinCode = ref("");
       // eslint-disable-next-line 
       const player2Id = ref(0);
       const IA_ID = 0;
@@ -114,6 +129,10 @@
       onMounted(() => {
         loadProgress(); // Charger la progression au montage
       });
+
+	  const toggleJoinInput = () => {
+		showJoinInput.value = !showJoinInput.value;
+	  };
   
         // Fonction pour enregistrer le résultat de la partie
       const saveGameResult = async (result,winnerId) => {
@@ -121,18 +140,18 @@
           try {
              console.log("Envoie des résultats :", {
                game_name: "JeuDesDes",
-               player1_id: player1Id.value,
+               player1_id: userId.value,
                player2_id: mode.value === "local" ? player2Id.value : IA_ID,
-               winner_id: winnerId,
+               winner_id: winnerId === IA_ID ? IA_ID : userId.value,
                result,
                session_id: sessionId,
               });
   
             const response = await api.post("/game-sessions", {
              game_name: "JeuDesDes",
-              player1_id: player1Id.value,
+              player1_id: userId.value,
               player2_id: mode.value === "local" ? player2Id.value : IA_ID,
-              winner_id: winnerId,
+              winner_id: winnerId === IA_ID ? IA_ID : userId.value,
               result: result,
               session_id: sessionId,
             });
@@ -237,18 +256,18 @@
   
        const determineWinner = () => {
               let result;
-               let winnerId = null;
+               let winnerId_ = null;
              if (playerRoll.value > opponentRoll.value) {
                   winner.value = "Joueur 1 gagne !";
                   scores.player++;
                   result = 'victoire';
-                  winnerId = player1Id.value;
+                  winnerId_ = userId.value;
                   victoiresConsecutives.value++;
           } else if (playerRoll.value < opponentRoll.value) {
                   winner.value = mode.value === "local" ? "Joueur 2 gagne !" : "L'IA gagne !";
                   scores.opponent++;
                    result = 'défaite';
-                   winnerId = IA_ID;
+                   winnerId_ = IA_ID;
                    if (mode.value === 'ia') {
                       victoiresIA.value++;
                    }
@@ -261,7 +280,7 @@
               if (mode.value === "local" && playerRoll.value > opponentRoll.value) {
                   victoiresLocal.value++;
                 }
-            saveGameResult(result,winnerId);
+            saveGameResult(result,winnerId_);
           };
   
       // Réinitialise la partie
@@ -302,6 +321,11 @@
         startGame,
         rollDie,
         resetGame,
+		showJoinInput,
+		gameCode,
+		joinCode,
+		isHost,
+		toggleJoinInput,
         userId,
       };
     },

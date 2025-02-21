@@ -112,18 +112,18 @@ export default {
             try {
                console.log("Envoie des résultats :", {
                   game_name: "PierreFeuilleCiseaux",
-                  player1_id: player1Id.value,
+                  player1_id: userId.value,
                   player2_id: IA_ID,
-                   winner_id: winnerId,
+                   winner_id: winnerId === IA_ID ? IA_ID : userId.value,
                   result,
                  session_id: sessionId,
               });
 
              const response = await api.post("/game-sessions", {
                   game_name: "PierreFeuilleCiseaux",
-                    player1_id: player1Id.value,
+                    player1_id: userId.value,
                   player2_id: IA_ID,
-                 winner_id: winnerId,
+                 winner_id: winnerId === IA_ID ? IA_ID : userId.value,
                    result: result,
                    session_id: sessionId,
               });
@@ -198,12 +198,13 @@ export default {
             monChoix.value = monChoix_;
             choixIA.value = choisirIA();
             let result;
+            let winnerId_ = null;
 
             if (monChoix.value === choixIA.value) {
                 resultatPartie.value = "Égalité !";
                 egalites.value++;
                 result = 'égalité';
-                winnerId.value = null
+                winnerId_ = null
                 victoiresConsecutives.value = 0;
                 saveProgress();
             } else if (
@@ -214,14 +215,14 @@ export default {
                 resultatPartie.value = "Victoire !";
                 victoires.value++;
                 result = 'victoire';
-                winnerId.value = player1Id.value;
+                winnerId_ = userId.value;
                 victoiresConsecutives.value++;
                 saveProgress();
             } else {
                 resultatPartie.value = "Défaite !";
                 defaites.value++;
                 result = 'défaite';
-                winnerId.value = IA_ID;
+                winnerId_ = IA_ID;
                 victoiresConsecutives.value = 0;
                  saveProgress();
             }
