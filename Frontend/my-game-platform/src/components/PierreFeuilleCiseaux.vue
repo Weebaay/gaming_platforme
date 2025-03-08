@@ -1,82 +1,136 @@
 <template>
-    <div class="pierre-feuille-ciseaux">
-        <UserProfile />
-        <p>User ID: {{ userId }}</p>
+  <div class="pfc-container">
+    <nav class="navbar">
+      <div class="navbar-brand">HolberGames</div>
+      <router-link to="/home" class="home-link">
+        <i class="fas fa-home"></i>
+      </router-link>
+    </nav>
 
-        <h1>Pierre Feuille Ciseaux</h1>
+    <div class="game-area">
+      <div class="hologram-particles">
+        <div v-for="n in 80" :key="n" class="holo-particle"></div>
+      </div>
 
-        <!-- Boutons pour jouer -->
-        <div>
-            <button @click="jouer('pierre')">
-                <img src="/images/point.png" alt="Pierre" width="100" height="100" />
-            </button>
-            <button @click="jouer('feuille')">
-                <img src="/images/main(feuille).png" alt="Feuille" width="100" height="100" />
-            </button>
-            <button @click="jouer('ciseaux')">
-                <img src="/images/_ciseaux.png" alt="Ciseaux" width="100" height="100" />
-            </button>
+      <h1 class="holo-title">Pierre Feuille Ciseaux</h1>
+
+      <div class="score-display">
+        <div class="score-container player">
+          <div class="score-hologram">
+            <span class="score-value">{{ victoires }}</span>
+            <span class="score-label">JOUEUR</span>
+          </div>
         </div>
-
-        <!-- Résultat -->
-        <p :class="{ 'js-resultat': true, visible: resultatVisible }">{{ resultatPartie }}</p>
-
-        <!-- Choix utilisateur et IA -->
-        <div class="choice-container">
-            <div class="choice">Votre choix: {{ monChoix }}</div>
-            <div class="vs">VS</div>
-            <div  class="choice">Choix de l'IA: {{ choixIA }}</div>
+        <div class="vs-hologram">VS</div>
+        <div class="score-container computer">
+          <div class="score-hologram">
+            <span class="score-value">{{ defaites }}</span>
+            <span class="score-label">IA</span>
+          </div>
         </div>
+      </div>
 
-        <!-- Score -->
-        <p class="js-score">Victoires: {{ victoires }} | Défaites: {{ defaites }} | Égalités: {{ egalites }}</p>
-        <p class="js-score">Victoires consécutives: {{ victoiresConsecutives }}</p>
+      <button @click="mettreScoreZero" class="reset-button">
+        <span class="reset-icon">↺</span>
+        <span class="reset-text">Réinitialiser le score</span>
+        <div class="reset-ring"></div>
+      </button>
 
-        <!-- Recommencer -->
-        <button @click="mettreScoreZero">Recommencer</button>
+      <div class="game-state" v-if="monChoix && choixIA">
+        <div class="player-choice">
+          <div class="choice-display">
+            <div class="hologram-symbol player">
+              <span v-if="monChoix === 'pierre'">✊</span>
+              <span v-if="monChoix === 'feuille'">✋</span>
+              <span v-if="monChoix === 'ciseaux'">✌️</span>
+            </div>
+            <span class="choice-label">Votre choix</span>
+          </div>
+        </div>
+        <div class="vs-animation">VS</div>
+        <div class="ia-choice">
+          <div class="choice-display">
+            <div class="hologram-symbol ia">
+              <span v-if="choixIA === 'pierre'">✊</span>
+              <span v-if="choixIA === 'feuille'">✋</span>
+              <span v-if="choixIA === 'ciseaux'">✌️</span>
+            </div>
+            <span class="choice-label">Choix de l'IA</span>
+          </div>
+        </div>
+      </div>
 
-        <!-- Statistiques -->
-        <h2>Statistiques</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Statistique</th>
-                    <th>Valeur</th>
-                </tr>
-                </thead>
-            <tbody>
-                <tr>
-                    <td>Victoires</td>
-                    <td>{{ victoires }}</td>
-                </tr>
-                <tr>
-                    <td>Défaites</td>
-                    <td>{{ defaites }}</td>
-                </tr>
-                <tr>
-                    <td>Égalités</td>
-                    <td>{{ egalites }}</td>
-                </tr>
-                <tr>
-                    <td>Victoires consécutives</td>
-                    <td>{{ victoiresConsecutives }}</td>
-                </tr>
-            </tbody>
-        </table>
+      <div class="choices-container">
+        <button 
+          v-for="choice in ['pierre', 'feuille', 'ciseaux']" 
+          :key="choice"
+          @click="jouer(choice)"
+          class="choice-btn"
+          :class="choice"
+        >
+          <div class="hologram-symbol">
+            <span v-if="choice === 'pierre'">✊</span>
+            <span v-if="choice === 'feuille'">✋</span>
+            <span v-if="choice === 'ciseaux'">✌️</span>
+          </div>
+          <div class="hologram-ring"></div>
+        </button>
+      </div>
+
+      <div v-if="victoiresConsecutives > 2" class="streak-counter">
+        Série: {{ victoiresConsecutives }} 🔥
+      </div>
+
+      <div class="result-hologram" :class="{ 
+        visible: resultatVisible,
+        victoire: resultatPartie === 'Victoire !',
+        defaite: resultatPartie === 'Défaite !',
+        egalite: resultatPartie === 'Égalité !'
+      }">
+        <div class="result-content">{{ resultatPartie }}</div>
+      </div>
+
+      <!-- Effet spécial pour les séries -->
+      <div v-if="showSpecialEffect" class="special-effect">
+        <div class="special-text">INCROYABLE !</div>
+        <div class="special-stars"></div>
+      </div>
+
+      <!-- Historique des coups -->
+      <div class="history-container">
+        <div class="history-title">Historique</div>
+        <div class="history-list">
+          <div v-for="(coup, index) in historique" 
+               :key="index" 
+               class="history-item"
+               :class="coup.resultat">
+            <div class="history-symbols">
+              <span class="history-player">
+                <span v-if="coup.joueur === 'pierre'">✊</span>
+                <span v-if="coup.joueur === 'feuille'">✋</span>
+                <span v-if="coup.joueur === 'ciseaux'">✌️</span>
+              </span>
+              <span class="history-vs">VS</span>
+              <span class="history-ia">
+                <span v-if="coup.ia === 'pierre'">✊</span>
+                <span v-if="coup.ia === 'feuille'">✋</span>
+                <span v-if="coup.ia === 'ciseaux'">✌️</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 </template>
-  
+
 <script>
 import { computed, ref, onMounted } from "vue";
 import api from "../services/api";
-import UserProfile from './UserProfile.vue';
 import { decodeJWT } from '@/util/utils';
 
 export default {
   name: "PierreFeuilleCiseaux",
-  components: {
-    UserProfile,
-  },
   setup() {
     const victoires = ref(0);
     const defaites = ref(0);
@@ -90,6 +144,8 @@ export default {
     const resultatPartie = ref("");
     const resultatVisible = ref(false);
     const winnerId = ref(null);
+    const historique = ref([]);
+    const showSpecialEffect = ref(false);
 
     const userId =  computed(() => {
         const token = localStorage.getItem('token');
@@ -188,9 +244,10 @@ export default {
 
         // Pour l'affichage du resultat
         const afficherResultat = () => {
-            resultatVisible.value = false;
-            void resultatPartie.value;
             resultatVisible.value = true;
+            setTimeout(() => {
+                resultatVisible.value = false;
+            }, 2000);
         };
 
         // Lancement du jeu
@@ -226,8 +283,30 @@ export default {
                 victoiresConsecutives.value = 0;
                  saveProgress();
             }
-           saveGameResult(result, winnerId.value);
-           afficherResultat();
+          
+            // Ajouter le coup à l'historique
+            historique.value.unshift({
+              joueur: monChoix.value,
+              ia: choixIA.value,
+              resultat: result,
+              timestamp: Date.now()
+            });
+            
+            // Garder seulement les 5 derniers coups
+            if (historique.value.length > 5) {
+              historique.value.pop();
+            }
+
+            // Animation spéciale pour 5 victoires consécutives
+            if (victoiresConsecutives.value >= 5) {
+              showSpecialEffect.value = true;
+              setTimeout(() => {
+                showSpecialEffect.value = false;
+              }, 3000);
+            }
+
+            saveGameResult(result, winnerId.value);
+            afficherResultat();
         };
 
      const mettreScoreZero = () => {
@@ -257,60 +336,658 @@ export default {
       mettreScoreZero,
       jouer,
       userId,
+      historique,
+      showSpecialEffect
     };
   },
 };
 </script>
   
 <style scoped>
-body {
-  background-color: #33e3ea;
-  color: #28039a;
-  font-family: Arial, sans-serif;
-  text-align: center;
-  padding: 20px;
+.pfc-container {
+  min-height: 100vh;
+  background: #1a1a1a;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-button {
-  background-color: #28039a;
-  color: white;
-  border: none;
-  padding: 15px 32px;
-  font-size: 16px;
-  margin: 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
+.navbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: linear-gradient(90deg, 
+    rgba(138, 43, 226, 0.9) 0%,
+    rgba(0, 191, 255, 0.9) 50%,
+    rgba(0, 255, 157, 0.9) 100%
+  );
+  box-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.5),
+    0 0 20px rgba(0, 191, 255, 0.3),
+    0 0 30px rgba(0, 255, 157, 0.2);
+  backdrop-filter: blur(10px);
+  z-index: 10;
 }
 
-button:hover {
-  background-color: #048e26;
-  transform: scale(1.1);
+.navbar-brand {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
 }
 
-.js-resultat {
+.home-link {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.home-link:hover {
+  color: #00bfff;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.8);
+}
+
+.game-area {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.hologram-particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.holo-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
   opacity: 0;
-  font-size: 16px;
-  font-weight: bold;
-  transition: opacity 0.5s, transform 0.5s;
+  border-radius: 50%;
+  bottom: -10px;
+  animation: floatParticle var(--duration, 8s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  left: var(--left, 50%);
 }
 
-.js-resultat.visible {
+.holo-particle:nth-child(n) {
+  --delay: calc(random() * 8s);
+  --left: calc(random() * 100%);
+}
+
+.holo-title {
+  font-size: 3rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 2rem 0;
+  text-shadow: 
+    0 0 10px rgba(0, 191, 255, 0.5),
+    0 0 20px rgba(0, 191, 255, 0.3);
+  letter-spacing: 2px;
+}
+
+.score-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  margin: 3rem 0;
+}
+
+.score-container {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.score-hologram {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 191, 255, 0.1);
+  border-radius: 50%;
+  border: 2px solid rgba(0, 191, 255, 0.3);
+  animation: hologramPulse 2s ease-in-out infinite;
+  backdrop-filter: blur(5px);
+}
+
+.score-value {
+  font-size: 3rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.8);
+}
+
+.score-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 2px;
+  margin-top: 0.5rem;
+}
+
+.vs-hologram {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
+}
+
+.game-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4rem;
+  margin: 2rem 0;
+  padding: 2rem;
+  background: rgba(0, 191, 255, 0.05);
+  border-radius: 20px;
+  backdrop-filter: blur(5px);
+}
+
+.choice-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.choice-label {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+}
+
+.vs-animation {
+  font-size: 2.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.8),
+    0 0 20px rgba(0, 191, 255, 0.6);
+  animation: pulseVS 1.5s ease-in-out infinite;
+}
+
+.hologram-symbol.player {
+  color: rgba(138, 43, 226, 0.9);
+  text-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.8),
+    0 0 20px rgba(138, 43, 226, 0.6),
+    0 0 30px rgba(138, 43, 226, 0.4);
+}
+
+.hologram-symbol.ia {
+  color: rgba(0, 255, 157, 0.9);
+  text-shadow: 
+    0 0 10px rgba(0, 255, 157, 0.8),
+    0 0 20px rgba(0, 255, 157, 0.6),
+    0 0 30px rgba(0, 255, 157, 0.4);
+}
+
+.choices-container {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  margin: 4rem 0;
+}
+
+.choice-btn {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.hologram-symbol {
+  position: relative;
+  font-size: 4rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.8),
+    0 0 20px rgba(0, 191, 255, 0.6),
+    0 0 30px rgba(0, 255, 157, 0.4);
+  z-index: 2;
+  transition: all 0.3s ease;
+  animation: appearChoice 0.5s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.hologram-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid rgba(0, 191, 255, 0.3);
+  border-radius: 50%;
+  animation: hologramRing 2s linear infinite;
+}
+
+.choice-btn:hover .hologram-symbol {
+  transform: scale(1.2);
+  color: #00bfff;
+  text-shadow: 
+    0 0 15px rgba(138, 43, 226, 1),
+    0 0 25px rgba(0, 191, 255, 0.8),
+    0 0 35px rgba(0, 255, 157, 0.6);
+}
+
+.choice-btn:hover .hologram-ring {
+  border-color: rgba(0, 191, 255, 0.8);
+  box-shadow: 
+    0 0 10px rgba(0, 191, 255, 0.3),
+    0 0 20px rgba(0, 191, 255, 0.2) inset;
+}
+
+.result-hologram {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: rgba(0, 191, 255, 0.1);
+  padding: 2rem 4rem;
+  border-radius: 15px;
+  border: 2px solid rgba(0, 191, 255, 0.3);
+  opacity: 0;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 20px rgba(138, 43, 226, 0.3),
+    0 0 40px rgba(0, 191, 255, 0.2),
+    0 0 60px rgba(0, 255, 157, 0.1);
+  --result-color: rgba(0, 191, 255, 0.8);
+}
+
+.result-hologram.visible {
+  transform: translate(-50%, -50%) scale(1);
   opacity: 1;
-  font-size: 30px;
-  transform: scale(1.1);
 }
-  .choice {
-      opacity: 1;
-      font-size: 16px;
-      font-weight: bold;
-      transition: opacity 0.5s, transform 0.5s;
+
+.result-hologram.victoire {
+  --result-color: rgba(0, 255, 157, 0.8);
+}
+
+.result-hologram.defaite {
+  --result-color: rgba(255, 99, 71, 0.8);
+}
+
+.result-hologram.egalite {
+  --result-color: rgba(255, 223, 0, 0.8);
+}
+
+.result-content {
+  font-size: 2.5rem;
+  color: var(--result-color);
+  text-shadow: 
+    0 0 10px var(--result-color),
+    0 0 20px var(--result-color),
+    0 0 30px var(--result-color);
+  letter-spacing: 2px;
+}
+
+@keyframes hologramPulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(138, 43, 226, 0.3),
+      0 0 30px rgba(0, 191, 255, 0.2),
+      0 0 45px rgba(0, 255, 157, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 25px rgba(138, 43, 226, 0.4),
+      0 0 50px rgba(0, 191, 255, 0.3),
+      0 0 75px rgba(0, 255, 157, 0.2);
+  }
+}
+
+@keyframes hologramRing {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(180deg);
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+  }
+}
+
+@keyframes pulseVS {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes appearChoice {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Ajustements responsifs */
+@media (max-width: 768px) {
+  .choices-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
   }
 
-  .vs {
-      opacity: 1;
-      font-size: 20px;
-      margin: 0 10px;
+  .score-display {
+    flex-direction: column;
+    gap: 1.5rem;
   }
+
+  .score-container {
+    width: 120px;
+    height: 120px;
+  }
+
+  .score-value {
+    font-size: 2.5rem;
+  }
+
+  .game-state {
+    flex-direction: column;
+    gap: 2rem;
+    padding: 1rem;
+  }
+
+  .vs-animation {
+    font-size: 2rem;
+  }
+}
+
+.reset-button {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 1rem 2rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.reset-icon {
+  font-size: 1.5rem;
+  animation: spin 4s linear infinite;
+}
+
+.reset-text {
+  letter-spacing: 2px;
+  text-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.5),
+    0 0 20px rgba(0, 191, 255, 0.3);
+}
+
+.reset-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid rgba(0, 191, 255, 0.3);
+  border-radius: 30px;
+  transition: all 0.3s ease;
+}
+
+.reset-button:hover {
+  color: #00bfff;
+}
+
+.reset-button:hover .reset-ring {
+  border-color: rgba(0, 191, 255, 0.8);
+  box-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.3),
+    0 0 20px rgba(0, 191, 255, 0.2),
+    0 0 30px rgba(0, 255, 157, 0.1);
+  transform: scale(1.05);
+}
+
+.reset-button:hover .reset-text {
+  text-shadow: 
+    0 0 15px rgba(138, 43, 226, 0.8),
+    0 0 25px rgba(0, 191, 255, 0.6);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ajout à la section responsive */
+@media (max-width: 768px) {
+  .reset-button {
+    font-size: 1rem;
+    padding: 0.8rem 1.5rem;
+  }
+  
+  .reset-icon {
+    font-size: 1.2rem;
+  }
+}
+
+/* Correction de l'animation des particules */
+@keyframes floatParticle {
+  0% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-10vh);
+    opacity: 0;
+  }
+}
+
+/* Style pour l'historique */
+.history-container {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 191, 255, 0.05);
+  padding: 1rem;
+  border-radius: 15px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(0, 191, 255, 0.3);
+  width: 200px;
+}
+
+.history-title {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-item {
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: rgba(0, 191, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.history-item.victoire {
+  border-left: 3px solid rgba(0, 255, 157, 0.8);
+}
+
+.history-item.defaite {
+  border-left: 3px solid rgba(255, 99, 71, 0.8);
+}
+
+.history-item.egalite {
+  border-left: 3px solid rgba(255, 223, 0, 0.8);
+}
+
+.history-symbols {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.5rem;
+}
+
+.history-vs {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Style pour l'effet spécial */
+.special-effect {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  animation: specialEffectBg 3s ease-out forwards;
+}
+
+.special-text {
+  font-size: 4rem;
+  color: #fff;
+  text-shadow: 
+    0 0 20px rgba(138, 43, 226, 1),
+    0 0 40px rgba(0, 191, 255, 1),
+    0 0 60px rgba(0, 255, 157, 1);
+  animation: specialTextEffect 3s ease-out forwards;
+  z-index: 101;
+}
+
+.special-stars {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle, transparent 20%, #1a1a1a 90%),
+    repeating-linear-gradient(0deg, 
+      rgba(138, 43, 226, 0.2) 0%, 
+      rgba(0, 191, 255, 0.2) 33%, 
+      rgba(0, 255, 157, 0.2) 66%
+    );
+  animation: specialStars 3s ease-out forwards;
+  z-index: 99;
+}
+
+@keyframes specialEffectBg {
+  0% {
+    background: transparent;
+  }
+  20% {
+    background: rgba(0, 0, 0, 0.8);
+  }
+  80% {
+    background: rgba(0, 0, 0, 0.8);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes specialTextEffect {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@keyframes specialStars {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.5) rotate(180deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1.5) rotate(360deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+/* Ajustements responsifs */
+@media (max-width: 768px) {
+  .history-container {
+    position: relative;
+    right: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    margin-top: 2rem;
+  }
+
+  .special-text {
+    font-size: 3rem;
+  }
+}
 </style>
   

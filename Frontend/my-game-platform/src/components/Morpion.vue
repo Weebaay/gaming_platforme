@@ -1,23 +1,48 @@
 <template>
     <div class="morpion">
-        <UserProfile />
-        <p>User ID: {{ userId }}</p>
-        <h1>Morpion Games 2.0</h1>
-        <div v-if="!gameStarted">
+        <div class="particles-container">
+            <div v-for="n in 50" :key="n" class="particle" :style="{ 
+                '--delay': `${Math.random() * 5}s`,
+                '--left': `${Math.random() * 100}%`,
+                '--size': `${Math.random() * 10 + 5}px`,
+                '--color': Math.random() > 0.5 ? '#8a2be2' : '#00bfff'
+            }"></div>
+        </div>
+        <router-link to="/home" class="home-icon">
+            <i class="fas fa-home"></i>
+        </router-link>
+        <h1>Morpion Games</h1>
+        <div v-if="!gameStarted" class="game-mode-selection">
             <h2>Choisissez un mode de jeu</h2>
-            <button @click="startGame('solo')">Jouer en Solo contre l'IA</button>
-            <button @click="startGame('private')">Créer une Partie Privée</button>
-            <button @click="startGame('free')">Free Partie (Local)</button>
-
-            <button @click="toggleJoinInput">Rejoindre une Partie</button>
-
-            <div v-if="showJoinInput">
-                <input v-model="joinCode" placeholder="Entrez le code de la partie" />
-                <button @click="joinGame">Rejoindre</button>
+            <div class="neon-buttons">
+                <button @click="startGame('solo')" class="neon-button">
+                    Jouer en Solo contre l'IA
+                    <div class="neon-border"></div>
+                </button>
+                <button @click="startGame('private')" class="neon-button">
+                    Créer une Partie Privée
+                    <div class="neon-border"></div>
+                </button>
+                <button @click="startGame('free')" class="neon-button">
+                    Free Partie (Local)
+                    <div class="neon-border"></div>
+                </button>
+                <button @click="toggleJoinInput" class="neon-button">
+                    Rejoindre une Partie
+                    <div class="neon-border"></div>
+                </button>
             </div>
-            <div v-if="isHost">
+
+            <div v-if="showJoinInput" class="join-section">
+                <input v-model="joinCode" placeholder="Entrez le code de la partie" class="neon-input" />
+                <button @click="joinGame" class="neon-button">
+                    Rejoindre
+                    <div class="neon-border"></div>
+                </button>
+            </div>
+            <div v-if="isHost" class="host-section">
                 <p>Partagez ce code avec votre ami pour qu'il rejoigne :</p>
-                <p class="code">{{ gameCode }}</p>
+                <p class="code neon-text">{{ gameCode }}</p>
             </div>
         </div>
 
@@ -27,6 +52,7 @@
             <p v-else>{{ winner }}</p>
             <div class="grid">
                 <div v-for="(cell, index) in grid" :key="index" class="cell" :class="{ taken: cell }"
+                    :data-content="cell"
                     @click="!cell && makeMove(index)">
                     {{ cell }}
                 </div>
@@ -39,14 +65,12 @@
 <script>
 import { ref, reactive, computed, onUnmounted, onMounted } from "vue";
 import api from "../services/api";
-import UserProfile from './UserProfile.vue';
 import { decodeJWT } from '@/util/utils';
 import { io } from 'socket.io-client';
 
 export default {
     name: "MorpionGame2",
     components: {
-        UserProfile,
     },
     setup() {
         const grid = reactive(Array(9).fill(""));
@@ -100,23 +124,31 @@ export default {
             socket.value.on('disconnect', () => {
                 console.log('Déconnecté du serveur WebSocket');
             });
-             //  Écoute l'événement 'updateGame'
+            
+            // Amélioration de la gestion des mises à jour du jeu
             socket.value.on('updateGame', (data) => {
-            console.log('Mise à jour du jeu reçue via WebSocket:', data);
-            //Mettre a jours les informations de jeux
+                console.log('Mise à jour du jeu reçue via WebSocket:', data);
+                
+                // Mise à jour de la grille
                 if (data.grid) {
-                    for (let i = 0; i < 9; i++) {
-                        grid[i] = data.grid[i];
-                    }
+                    // Mise à jour directe de la grille
+                    Object.assign(grid, data.grid);
+                    console.log('Grille mise à jour:', grid);
                 }
+
+                // Mise à jour du gagnant
                 if (data.winner) {
                     winner.value = `Le joueur ${data.winner} a gagné !`;
                 }
+
+                // Gestion du match nul
                 if (data.draw) {
                     winner.value = "Match nul !";
                 }
+
+                // Mise à jour du joueur actuel
                 if (data.currentPlayer) {
-                   currentPlayer.value = data.currentPlayer;
+                    currentPlayer.value = data.currentPlayer;
                 }
             });
         });
@@ -179,24 +211,35 @@ export default {
             });
         };
 
-        // Gérer un mouvement
+        // Modification de la fonction makeMove pour les parties multijoueur
         const makeMove = async (index) => {
-            // Vérifier que la case est vide, qu'il n'y a pas de gagnant, et que c'est au tour du joueur
-            if (
-                !grid[index] &&
-                !winner.value &&
-                (currentPlayer.value === playerSymbol.value || !isMultiplayer.value)
-            ) {
+            if (!grid[index] && !winner.value && 
+                (currentPlayer.value === playerSymbol.value || !isMultiplayer.value)) {
                 try {
                     if (isMultiplayer.value) {
-                        // En mode multijoueur, envoyer la demande au backend
-                        console.log("isHost:", isHost.value, "gameCode:", gameCode.value, "joinCode:", joinCode.value);
-                        socket.value.emit('makeMove', { // Emettre un événement WebSocket
+                        console.log("Envoi du coup:", {
                             sessionId: sessionID.value,
                             index,
-                            player: playerSymbol.value,
+                            player: playerSymbol.value
                         });
 
+                        // Mise à jour locale immédiate pour l'émetteur
+                        grid[index] = playerSymbol.value;
+
+                        // Émission du coup vers le serveur
+                        socket.value.emit('makeMove', {
+                            sessionId: sessionID.value,
+                            index,
+                            player: playerSymbol.value
+                        }, (response) => {
+                            if (response && response.error) {
+                                // En cas d'erreur, annuler le coup local
+                                grid[index] = "";
+                                console.error('Erreur lors du coup:', response.error);
+                            } else {
+                                console.log('Coup validé par le serveur');
+                            }
+                        });
                     } else {
                         // En mode solo ou local
                         grid[index] = currentPlayer.value;
@@ -236,12 +279,10 @@ export default {
                         }
                     }
                 } catch (error) {
-                    // Gestion des erreurs
                     console.error("Erreur lors de l'envoi du mouvement :", error);
-                    if (error.response && error.response.data && error.response.data.error) {
-                        alert(error.response.data.error); // Afficher le message d'erreur renvoyé par le backend
-                    } else {
-                        alert("Impossible d'envoyer votre mouvement. Veuillez réessayer.");
+                    // Annuler le coup en cas d'erreur
+                    if (isMultiplayer.value) {
+                        grid[index] = "";
                     }
                 }
             } else {
@@ -421,41 +462,319 @@ export default {
   
 <style scoped>
     .morpion {
+        min-height: 100vh;
+        padding: 2rem;
+        background: #1a1a1a;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .particles-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .particle {
+        position: absolute;
+        bottom: -20px;
+        left: var(--left);
+        width: var(--size);
+        height: var(--size);
+        background: var(--color);
+        border-radius: 50%;
+        animation: floatUp 10s linear infinite;
+        animation-delay: var(--delay);
+        opacity: 0;
+        filter: blur(2px);
+        box-shadow: 
+            0 0 10px var(--color),
+            0 0 20px var(--color),
+            0 0 30px var(--color);
+    }
+
+    @keyframes floatUp {
+        0% {
+            transform: translateY(0) scale(1);
+            opacity: 0;
+        }
+        10% {
+            opacity: 0.8;
+        }
+        90% {
+            opacity: 0.8;
+        }
+        100% {
+            transform: translateY(-100vh) scale(0.5);
+            opacity: 0;
+        }
+    }
+
+    .home-icon {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 2rem;
+        color: #8a2be2;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        text-shadow: 
+            0 0 10px #8a2be2,
+            0 0 20px #8a2be2,
+            0 0 30px #8a2be2;
+        z-index: 3;
+    }
+
+    .home-icon:hover {
+        color: #00bfff;
+        transform: scale(1.1);
+        text-shadow: 
+            0 0 10px #00bfff,
+            0 0 20px #00bfff,
+            0 0 30px #00bfff;
+    }
+
+    .game-mode-selection {
         text-align: center;
+        margin: 2rem auto;
+        max-width: 800px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .neon-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .neon-button {
+        position: relative;
+        padding: 1rem 2rem;
+        font-size: 1.2rem;
+        color: white;
+        background: rgba(138, 43, 226, 0.1);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 
+            0 0 10px rgba(138, 43, 226, 0.3),
+            0 0 20px rgba(138, 43, 226, 0.2),
+            0 0 30px rgba(138, 43, 226, 0.1);
+    }
+
+    .neon-button:hover {
+        background: rgba(0, 191, 255, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 
+            0 0 15px rgba(0, 191, 255, 0.4),
+            0 0 30px rgba(0, 191, 255, 0.3),
+            0 0 45px rgba(0, 191, 255, 0.2);
+    }
+
+    .neon-border {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        animation: neonBorder 1.5s ease-in-out infinite;
+    }
+
+    @keyframes neonBorder {
+        0%, 100% {
+            border-color: #8a2be2;
+            box-shadow: 
+                0 0 10px #8a2be2,
+                0 0 20px #8a2be2;
+        }
+        50% {
+            border-color: #00bfff;
+            box-shadow: 
+                0 0 10px #00bfff,
+                0 0 20px #00bfff;
+        }
+    }
+
+    .neon-input {
+        padding: 0.8rem 1.5rem;
+        font-size: 1rem;
+        color: white;
+        background: rgba(138, 43, 226, 0.1);
+        border: 2px solid #8a2be2;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        width: 100%;
+        max-width: 300px;
+        transition: all 0.3s ease;
+    }
+
+    .neon-input:focus {
+        outline: none;
+        border-color: #00bfff;
+        box-shadow: 
+            0 0 10px rgba(0, 191, 255, 0.4),
+            0 0 20px rgba(0, 191, 255, 0.2);
+    }
+
+    .neon-text {
+        font-size: 1.5rem;
+        color: #8a2be2;
+        text-shadow: 
+            0 0 10px #8a2be2,
+            0 0 20px #8a2be2;
+        animation: neonText 1.5s ease-in-out infinite;
+    }
+
+    @keyframes neonText {
+        0%, 100% {
+            color: #8a2be2;
+            text-shadow: 
+                0 0 10px #8a2be2,
+                0 0 20px #8a2be2;
+        }
+        50% {
+            color: #00bfff;
+            text-shadow: 
+                0 0 10px #00bfff,
+                0 0 20px #00bfff;
+        }
+    }
+
+    .join-section, .host-section {
+        margin-top: 2rem;
     }
 
     .grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 5px;
-        max-width: 300px;
+        gap: 10px;
+        max-width: 400px;
         margin: 20px auto;
+        padding: 15px;
+        background: rgba(255, 49, 49, 0.1);
+        border-radius: 15px;
+        box-shadow: 
+            0 0 10px rgba(255, 49, 49, 0.3),
+            0 0 20px rgba(255, 92, 49, 0.2),
+            inset 0 0 30px rgba(255, 49, 49, 0.1);
     }
 
     .cell {
-        border: 1px solid #000;
-        height: 100px;
+        height: 120px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px;
-        cursor: pointer;
-    }
-
-    .taken {
-        background: #f0f0f0;
-    }
-
-    .code {
+        font-size: 48px;
         font-weight: bold;
-        font-size: 18px;
-        color: #2c3e50;
+        cursor: pointer;
+        background: rgba(26, 26, 26, 0.8);
+        border: 2px solid #ff3131;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    .cell:hover {
+        transform: scale(1.05);
+        box-shadow: 
+            0 0 10px rgba(255, 49, 49, 0.4),
+            0 0 20px rgba(255, 92, 49, 0.3);
+    }
+
+    .cell:empty {
+        border-color: rgba(255, 49, 49, 0.3);
+    }
+
+    /* Style pour X */
+    .cell:not(:empty) {
+        animation: appearNeon 0.3s ease-out forwards;
+    }
+
+    .cell[data-content="X"], .cell:not(:empty):first-letter {
+        color: #8a2be2;
+        text-shadow: 
+            0 0 10px #8a2be2,
+            0 0 20px #8a2be2,
+            0 0 30px #8a2be2;
+    }
+
+    /* Style pour O */
+    .cell[data-content="O"] {
+        color: #00bfff;
+        text-shadow: 
+            0 0 10px #00bfff,
+            0 0 20px #00bfff,
+            0 0 30px #00bfff;
+    }
+
+    @keyframes appearNeon {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    button[type="reset"], button[type="button"] {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 1.2rem;
+        color: white;
+        background: rgba(255, 49, 49, 0.1);
+        border: 2px solid #ff3131;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    button[type="reset"]:hover, button[type="button"]:hover {
+        background: rgba(255, 92, 49, 0.2);
+        box-shadow: 
+            0 0 10px rgba(255, 49, 49, 0.4),
+            0 0 20px rgba(255, 92, 49, 0.3);
     }
 
     .winner {
-        font-weight: bold;
-        font-size: 20px;
+        font-size: 24px;
         margin: 20px 0;
-        color: #2ecc71;
+        padding: 10px;
+        text-align: center;
+        color: #8a2be2;
+        text-shadow: 
+            0 0 10px #8a2be2,
+            0 0 20px #8a2be2;
+        animation: neonText 1.5s ease-in-out infinite;
+    }
+
+    /* Styles pour les messages du jeu */
+    .morpion > div > p {
+        font-size: 1.2rem;
+        margin: 15px 0;
+        text-align: center;
+        color: #ff3131;
+        text-shadow: 
+            0 0 10px rgba(255, 49, 49, 0.4),
+            0 0 20px rgba(255, 92, 49, 0.3);
+    }
+
+    /* Ajout des styles pour UserProfile et User ID */
+    .morpion > p, .morpion > UserProfile {
+        margin-left: 80px; /* Espace pour l'icône home */
+        position: relative;
+        z-index: 2;
     }
 </style>

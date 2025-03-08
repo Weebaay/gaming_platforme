@@ -1,0 +1,29 @@
+:root {
+	/* Couleurs principales */
+	--secondary-dark: #1E1A1A;
+	--text-dark: #2D1F1F;
+
+	/* Animations */
+	--transition-speed: 0.3s;
+	--hover-scale: 1.05;
+
+	/* Ombres */
+	--box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+	/* Espacements */
+	--spacing-sm: 0.5rem;
+	--spacing-md: 1rem;
+	--spacing-lg: 2rem;
+
+	/* Bordures */
+	--border-radius: 8px;
+}
+
+/* Classes d'utilité */
+.hover-glow {
+	transition: all var(--transition-speed) ease;
+}
+
+.hover-glow:hover {
+	transform: scale(var(--hover-scale));
+}

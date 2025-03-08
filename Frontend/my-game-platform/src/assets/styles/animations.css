@@ -1,0 +1,147 @@
+/* Animation du logo pulsant */
+@keyframes pulse {
+	0% {
+		transform: scale(1);
+	}
+
+	50% {
+		transform: scale(1.05);
+	}
+
+	100% {
+		transform: scale(1);
+	}
+}
+
+.pulse-animation {
+	animation: pulse 2s infinite ease-in-out;
+}
+
+/* Animation d'apparition en flottant */
+@keyframes float-in {
+	0% {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.float-in {
+	animation: float-in 0.6s ease-out forwards;
+}
+
+/* Animation de particules en arrière-plan */
+@keyframes particle-move {
+	0% {
+		transform: translate(0, 0);
+	}
+
+	100% {
+		transform: translate(var(--move-x, 100px), var(--move-y, 100px));
+	}
+}
+
+/* Animation de transition glitch */
+@keyframes glitch {
+	0% {
+		clip-path: inset(50% 0 50% 0);
+		transform: skew(-10deg);
+	}
+
+	5% {
+		clip-path: inset(20% 0 80% 0);
+		transform: skew(10deg);
+	}
+
+	10% {
+		clip-path: inset(30% 0 70% 0);
+		transform: skew(-15deg);
+	}
+
+	15% {
+		clip-path: inset(10% 0 90% 0);
+		transform: skew(15deg);
+	}
+
+	20% {
+		clip-path: inset(40% 0 60% 0);
+		transform: skew(-5deg);
+	}
+
+	25% {
+		clip-path: inset(80% 0 20% 0);
+		transform: skew(5deg);
+	}
+
+	30% {
+		clip-path: inset(50% 0 50% 0);
+		transform: skew(0deg);
+	}
+
+	100% {
+		clip-path: inset(50% 0 50% 0);
+		transform: skew(0deg);
+	}
+}
+
+.glitch-transition {
+	animation: glitch 0.3s linear;
+}
+
+/* Animation de bouton avec onde */
+@keyframes ripple {
+	0% {
+		box-shadow: 0 0 0 0 rgba(255, 0, 51, 0.4);
+	}
+
+	100% {
+		box-shadow: 0 0 0 20px rgba(255, 0, 51, 0);
+	}
+}
+
+.ripple-button {
+	position: relative;
+	overflow: hidden;
+}
+
+.ripple-button:active {
+	animation: ripple 0.6s linear;
+}
+
+/* Animation de transition power-up */
+@keyframes power-up {
+	0% {
+		transform: scale(0);
+		opacity: 0;
+	}
+
+	50% {
+		transform: scale(1.2);
+		opacity: 0.5;
+	}
+
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+.power-up {
+	animation: power-up 0.5s ease-out;
+}
+
+/* Animation de traînée du curseur */
+.cursor-trail {
+	pointer-events: none;
+	position: fixed;
+	width: 10px;
+	height: 10px;
+	background: var(--accent-neon);
+	border-radius: 50%;
+	opacity: 0.6;
+	z-index: 9999;
+}

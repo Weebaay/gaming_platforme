@@ -7,6 +7,17 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 
+// Import Bootstrap CSS et JS
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+
+// Import Font Awesome
+import '@fortawesome/fontawesome-free/css/all.min.css';
+
+// Import des styles personnalisés
+import './assets/styles/theme.css';
+import './assets/styles/animations.css';
+
 const app = createApp(App);
 
 // Si vous avez un gestionnaire d'erreurs global
