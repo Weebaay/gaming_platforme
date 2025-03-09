@@ -55,30 +55,30 @@
 
             <!-- Joueurs -->
             <div class="players">
-                <div class="player" :class="{ 'active-player': turn === 'X' }">
-                    <h3>{{ mode === 'ia' ? 'Joueur 1' : mode === 'local' ? 'Joueur 1' : isHost ? 'Vous (Joueur 1)' : 'Adversaire (Joueur 1)' }}</h3>
+                <div class="player" :class="{ 'active-player': isHost ? (turn === 'X') : (turn === 'O') }">
+                    <h3>{{ mode === 'ia' ? 'Joueur 1' : mode === 'local' ? 'Joueur 1' : 'Vous' }}</h3>
                     <div class="die-container">
-                        <div class="matrix-numbers" v-if="rolling && turn === 'X'">
+                        <div class="matrix-numbers" v-if="rolling && (isHost ? (turn === 'X') : (turn === 'O'))">
                             <span v-for="n in 6" :key="n">{{ n }}</span>
                         </div>
-                        <img :src="playerDieImage || dieFaces[0]" alt="Dé" class="die" :class="{ 'matrix-roll': rolling && turn === 'X' }" />
+                        <img :src="playerDieImage || dieFaces[0]" alt="Dé" class="die" :class="{ 'matrix-roll': rolling && (isHost ? (turn === 'X') : (turn === 'O')) }" />
                     </div>
                     <div class="score-energy">
-                        <div class="energy-bar" :style="{ width: (scores.player * 10) + '%' }"></div>
-                        <p>Score: {{ scores.player }}</p>
+                        <div class="energy-bar" :style="{ width: (isHost ? scores.player : scores.opponent) * 10 + '%' }"></div>
+                        <p>Score: {{ isHost ? scores.player : scores.opponent }}</p>
                     </div>
                 </div>
-                <div class="player" :class="{ 'active-player': turn === 'O' }">
-                    <h3>{{ mode === 'ia' ? 'IA' : mode === 'local' ? 'Joueur 2' : isHost ? 'Adversaire (Joueur 2)' : 'Vous (Joueur 2)' }}</h3>
+                <div class="player" :class="{ 'active-player': isHost ? (turn === 'O') : (turn === 'X') }">
+                    <h3>{{ mode === 'ia' ? 'IA' : mode === 'local' ? 'Joueur 2' : 'Adversaire' }}</h3>
                     <div class="die-container">
-                        <div class="matrix-numbers" v-if="rolling && turn === 'O'">
+                        <div class="matrix-numbers" v-if="rolling && (isHost ? (turn === 'O') : (turn === 'X'))">
                             <span v-for="n in 6" :key="n">{{ n }}</span>
                         </div>
-                        <img :src="opponentDieImage || dieFaces[0]" alt="Dé" class="die" :class="{ 'matrix-roll': rolling && turn === 'O' }" />
+                        <img :src="opponentDieImage || dieFaces[0]" alt="Dé" class="die" :class="{ 'matrix-roll': rolling && (isHost ? (turn === 'O') : (turn === 'X')) }" />
                     </div>
                     <div class="score-energy">
-                        <div class="energy-bar" :style="{ width: (scores.opponent * 10) + '%' }"></div>
-                        <p>Score: {{ scores.opponent }}</p>
+                        <div class="energy-bar" :style="{ width: (isHost ? scores.opponent : scores.player) * 10 + '%' }"></div>
+                        <p>Score: {{ isHost ? scores.opponent : scores.player }}</p>
                     </div>
                 </div>
             </div>
@@ -86,26 +86,26 @@
             <!-- Lancer de dé -->
             <button 
                 @click="rollDie(turn)" 
-                :disabled="(mode === 'private' && turn !== currentPlayerSymbol) || rolling"
+                :disabled="(mode === 'private' && ((isHost && turn === 'O') || (!isHost && turn === 'X'))) || rolling"
                 class="action-button"
             >
-                {{ mode === 'ia' ? 'Lancer le dé' : `Lancer le dé (Joueur ${turn === 'X' ? '1' : '2'})` }}
+                {{ mode === 'ia' ? 'Lancer le dé' : 'Lancer le dé' }}
             </button>
 
             <!-- Afficher à qui est le tour -->
             <p v-if="!winner && mode !== 'ia'" class="turn-info">
-                Tour du joueur : {{ turn === 'X' ? 'Joueur 1' : 'Joueur 2' }}
+                Tour de : {{ isHost ? (turn === 'X' ? 'Vous' : 'Adversaire') : (turn === 'O' ? 'Vous' : 'Adversaire') }}
             </p>
 
             <!-- Scores -->
             <div class="scores">
                 <div>
-                    <h3>Joueur 1</h3>
-                    <p>{{ scores.player }}</p>
+                    <h3>{{ isHost ? 'Vous' : 'Adversaire' }}</h3>
+                    <p>{{ isHost ? scores.player : scores.opponent }}</p>
                 </div>
                 <div>
-                    <h3>{{ mode === 'ia' ? 'IA' : 'Joueur 2' }}</h3>
-                    <p>{{ scores.opponent }}</p>
+                    <h3>{{ isHost ? 'Adversaire' : 'Vous' }}</h3>
+                    <p>{{ isHost ? scores.opponent : scores.player }}</p>
                 </div>
             </div>
 
@@ -150,6 +150,7 @@ export default {
         const joinCode = ref("");
         const socket = ref(null);
         const sessionID = ref("");
+        const opponentName = ref("Joueur 2");
 
         // Ajout des variables pour les images des dés
         const dieFaces = [
@@ -199,15 +200,12 @@ export default {
             });
 
             socket.value.on('diceSessionJoined', (data) => {
-                console.log('=== Événement diceSessionJoined reçu ===');
-                console.log('Données reçues:', data);
                 console.log('État actuel - gameStarted:', gameStarted.value);
                 console.log('Nombre de joueurs dans la session:', data.players);
                 if (data.players === 2) {
                     console.log('Démarrage de la partie (2 joueurs présents)');
                     gameStarted.value = true;
                 }
-                console.log('=== Fin de traitement diceSessionJoined ===');
             });
 
             socket.value.on('updateDiceGame', (data) => {
@@ -228,16 +226,42 @@ export default {
                     }, 1000);
                 }
                 if (data.scores) {
-                    scores.player = data.scores.player1;
-                    scores.opponent = data.scores.player2;
+                    if (isHost.value) {
+                        scores.player = data.scores.player1;
+                        scores.opponent = data.scores.player2;
+                    } else {
+                        scores.player = data.scores.player2;
+                        scores.opponent = data.scores.player1;
+                    }
                 }
                 turn.value = data.currentPlayer;
                 console.log('Nouveau tour :', turn.value);
 
                 if (data.winner) {
-                    winner.value = data.winner === "draw" 
-                        ? "Égalité !" 
-                        : `Le joueur ${data.winner === "X" ? "1" : "2"} a gagné !`;
+                    const currentUsername = localStorage.getItem('username');
+                    const opponentUsername = data.opponentUsername;
+                    
+                    if (data.winner === "draw") {
+                        winner.value = "Égalité !";
+                    } else {
+                        const isWinner = (isHost.value && data.winner === "X") || (!isHost.value && data.winner === "O");
+                        if (isWinner) {
+                            winner.value = `${currentUsername} a gagné !`;
+                        } else {
+                            winner.value = opponentUsername ? `${opponentUsername} a gagné !` : "Adversaire a gagné !";
+                        }
+                    }
+                }
+            });
+
+            // Ajout de la gestion des noms des joueurs
+            socket.value.on('playerJoined', (data) => {
+                if (data.username) {
+                    if (isHost.value) {
+                        opponentName.value = data.username;
+                    } else {
+                        opponentName.value = data.hostUsername;
+                    }
                 }
             });
         });
@@ -276,14 +300,12 @@ export default {
                 return;
             }
 
-            console.log("Code de partie saisi:", joinCode.value);
             console.log("État actuel - isHost:", isHost.value);
             isHost.value = false;
             mode.value = "private";
             sessionID.value = joinCode.value;
             console.log("Émission de l'événement joinDiceSession avec le code:", joinCode.value);
             socket.value.emit('joinDiceSession', joinCode.value, (response) => {
-                console.log("Réponse du serveur après joinDiceSession:", response);
                 if (response && response.success) {
                     console.log("Partie rejointe avec succès");
                 } else {
@@ -291,7 +313,6 @@ export default {
                     alert("Impossible de rejoindre la partie. Vérifiez le code et réessayez.");
                 }
             });
-            console.log("=== Fin de joinGame ===");
         };
 
         const rollDie = async (player) => {
@@ -350,15 +371,24 @@ export default {
         const determineWinner = () => {
             let result;
             let winnerId = null;
+            const currentUsername = localStorage.getItem('username') || 'Joueur 1';
 
             if (playerRoll.value > opponentRoll.value) {
-                winner.value = isHost.value ? "Vous avez gagné !" : "Joueur 1 a gagné !";
+                winner.value = mode.value === "ia" 
+                    ? "Vous avez gagné !" 
+                    : isHost.value 
+                        ? `${currentUsername} a gagné !` 
+                        : `${opponentName.value} a gagné !`;
                 scores.player++;
                 result = 'victoire';
                 winnerId = userId.value;
                 victoiresConsecutives.value++;
             } else if (playerRoll.value < opponentRoll.value) {
-                winner.value = isHost.value ? "Joueur 2 a gagné !" : "Vous avez gagné !";
+                winner.value = mode.value === "ia" 
+                    ? "L'IA a gagné !" 
+                    : isHost.value 
+                        ? `${opponentName.value} a gagné !` 
+                        : `${currentUsername} a gagné !`;
                 scores.opponent++;
                 result = 'défaite';
                 winnerId = mode.value === "local" ? 0 : 0;
@@ -495,7 +525,8 @@ export default {
             victoiresConsecutives,
             toggleJoinInput,
             joinGame,
-            dieFaces
+            dieFaces,
+            opponentName
         };
     },
 };
