@@ -57,7 +57,7 @@
                     {{ cell }}
                 </div>
             </div>
-            <button @click="resetGame">Réinitialiser</button>
+            <button @click="resetGame">Retourquel sont les dernier fichier que nous avons modifier a fin de les sauvegarder sur git</button>
         </div>
     </div>
 </template>
@@ -151,6 +151,12 @@ export default {
                     currentPlayer.value = data.currentPlayer;
                 }
             });
+
+            // Ajoutez également un écouteur pour la déconnexion des joueurs
+            socket.value.on('playerDisconnected', (data) => {
+                alert(data.message);
+                resetGame();
+            });
         });
 
         const toggleJoinInput = () => {
@@ -173,20 +179,18 @@ export default {
                 isHost.value = true;
                 playerSymbol.value = "X"; // Premier Joueur commence
                 socket.value.emit('createSession', (sessionId) => {
-                gameCode.value = sessionId;
-                sessionID.value = gameCode.value;
-                console.log("Session ID stocké :", gameCode.value);
-                alert(`Code de la partie : ${gameCode.value}`);
-            });
+                    gameCode.value = sessionId;
+                    sessionID.value = gameCode.value;
+                    console.log("Session ID stocké :", gameCode.value);
+                    alert(`Code de la partie : ${gameCode.value}`);
+                });
             } else if (mode === "free") {
                 freeMode.value = true; // Mode local
+                isMultiplayer.value = false;
+                aiEnabled.value = false;
                 const sessionsId = 'F' + Math.random().toString(36).substring(2, 15);
                 sessionID.value = sessionsId;
                 console.log("session Id stocker pour le mode free :", sessionsId); 
-            }
-
-            if (aiEnabled.value && currentPlayer.value === "O") {
-                setTimeout(makeAIMove, 500);
             }
         };
 
@@ -213,86 +217,76 @@ export default {
 
         // Modification de la fonction makeMove pour les parties multijoueur
         const makeMove = async (index) => {
-            if (!grid[index] && !winner.value && 
-                (currentPlayer.value === playerSymbol.value || !isMultiplayer.value)) {
+            if (!grid[index] && !winner.value) {
                 try {
                     if (isMultiplayer.value) {
-                        console.log("Envoi du coup:", {
+                        // Code existant pour le mode multijoueur
+                        if (currentPlayer.value !== playerSymbol.value) {
+                            alert("Ce n'est pas votre tour !");
+                            return;
+                        }
+
+                        console.log("Tentative de coup:", {
                             sessionId: sessionID.value,
                             index,
                             player: playerSymbol.value
                         });
 
-                        // Mise à jour locale immédiate pour l'émetteur
-                        grid[index] = playerSymbol.value;
-
-                        // Émission du coup vers le serveur
                         socket.value.emit('makeMove', {
                             sessionId: sessionID.value,
                             index,
                             player: playerSymbol.value
                         }, (response) => {
-                            if (response && response.error) {
-                                // En cas d'erreur, annuler le coup local
-                                grid[index] = "";
-                                console.error('Erreur lors du coup:', response.error);
-                            } else {
-                                console.log('Coup validé par le serveur');
+                            if (response.error) {
+                                console.error('Erreur:', response.error);
+                                alert(response.error);
                             }
                         });
                     } else {
-                        // En mode solo ou local
-                        grid[index] = currentPlayer.value;
+                        // Mode solo ou local
+                        if (freeMode.value || (!freeMode.value && !aiEnabled.value) || (aiEnabled.value && currentPlayer.value === "X")) {
+                            grid[index] = currentPlayer.value;
 
-                        if (checkWinner(grid, currentPlayer.value)) {
-                            let result = currentPlayer.value === "X" ? 'victoire' : 'défaite';
-                            const winnerId = result === 'victoire' ? userId.value : IA_ID;
-                            winner.value = winnerId === IA_ID ? "L'IA a gagné !" : `Le joueur ${winnerId} a gagné !`;
+                            if (checkWinner(grid, currentPlayer.value)) {
+                                let result = currentPlayer.value === "X" ? 'victoire' : 'défaite';
+                                const winnerId = result === 'victoire' ? userId.value : IA_ID;
+                                winner.value = `Le joueur ${currentPlayer.value} a gagné !`;
 
-                            if (result === 'victoire') {
-                                gameWon.value++;
-                            } else {
-                                gamesLost.value++;
+                                if (freeMode.value) {
+                                    // En mode local, pas besoin de sauvegarder les statistiques
+                                    return;
+                                }
+
+                                if (result === 'victoire') {
+                                    gameWon.value++;
+                                } else {
+                                    gamesLost.value++;
+                                }
+                                await saveGameResult("Morpion", result, winnerId);
+                                await saveProgress();
+                                return;
                             }
-                            // Enregistrement du résultat après que le gagnant est déterminé
-                            await saveGameResult("Morpion", result, winnerId);
-                            await saveProgress()
-                            return;
-                        }
 
-                        if (!grid.includes("")) {
-                            winner.value = "Match nul !";
-                            gamesDrawn.value++;
+                            if (!grid.includes("")) {
+                                winner.value = "Match nul !";
+                                if (!freeMode.value) {
+                                    gamesDrawn.value++;
+                                    await saveGameResult("Morpion", "égalité", null);
+                                    await saveProgress();
+                                }
+                                return;
+                            }
 
-                            // Enregistrement du résultat en cas d'égalité
-                            await saveGameResult("Morpion", "égalité", null);
-                              await saveProgress()
-                            return;
-                        }
+                            currentPlayer.value = currentPlayer.value === "X" ? "O" : "X";
 
-                        // Passer au joueur suivant
-                        currentPlayer.value = currentPlayer.value === "X" ? "O" : "X";
-
-                        // Si l'IA est activée et c'est au tour de l'IA
-                        if (aiEnabled.value && currentPlayer.value === "O") {
-                            setTimeout(makeAIMove, 500); // Déclencher un mouvement IA après un court délai
+                            // Si l'IA est activée et c'est au tour de l'IA
+                            if (aiEnabled.value && currentPlayer.value === "O") {
+                                setTimeout(makeAIMove, 500);
+                            }
                         }
                     }
                 } catch (error) {
                     console.error("Erreur lors de l'envoi du mouvement :", error);
-                    // Annuler le coup en cas d'erreur
-                    if (isMultiplayer.value) {
-                        grid[index] = "";
-                    }
-                }
-            } else {
-                // Alerter le joueur si ce n'est pas son tour ou si la case est déjà prise
-                if (grid[index]) {
-                    alert("Cette case est déjà prise !");
-                } else if (winner.value) {
-                    alert("La partie est terminée !");
-                } else if (isMultiplayer.value && currentPlayer.value !== playerSymbol.value) {
-                    alert("Ce n'est pas votre tour !")
                 }
             }
         };
@@ -335,7 +329,31 @@ export default {
             if (availableMoves.length === 0) return;
 
             const randomIndex = Math.floor(Math.random() * availableMoves.length);
-            await makeMove(availableMoves[randomIndex]);
+            const moveIndex = availableMoves[randomIndex];
+            
+            // L'IA joue directement sur la grille
+            grid[moveIndex] = "O";
+
+            // Vérifier si l'IA a gagné
+            if (checkWinner(grid, "O")) {
+                winner.value = "L'IA a gagné !";
+                gamesLost.value++;
+                await saveGameResult("Morpion", "défaite", IA_ID);
+                await saveProgress();
+                return;
+            }
+
+            // Vérifier le match nul
+            if (!grid.includes("")) {
+                winner.value = "Match nul !";
+                gamesDrawn.value++;
+                await saveGameResult("Morpion", "égalité", null);
+                await saveProgress();
+                return;
+            }
+
+            // Passer le tour au joueur
+            currentPlayer.value = "X";
         };
         // Vérifier si un joueur a gagné
         const checkWinner = (board, player) => {

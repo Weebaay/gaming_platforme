@@ -77,11 +77,14 @@ router.post('/', verifyJWT, async (req, res) => {
         } else if (result === 'victoire') {
             // Victoire
             updateStats(winner_id, 'victoires');
-			updateStats(player1_id, 'defaites');
+            // On met à jour les défaites uniquement pour l'adversaire (IA ou joueur2)
+            if (player2_id && player2_id !== winner_id) {
+                updateStats(player2_id, 'defaites');
+            }
         } else if (result === 'défaite') {
-			// Défaite
-			updateStats(player1_id, 'defaites');
-		}
+            // Défaite
+            updateStats(player1_id, 'defaites');
+        }
         res.status(201).json({
             message: 'Session de jeu enregistrée avec succès.',
             gameSessionId: results.insertId,

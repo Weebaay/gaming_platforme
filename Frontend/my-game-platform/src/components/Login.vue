@@ -44,9 +44,18 @@ export default {
     const router = useRouter();
 
     const handleLogin = async () => {
+      // Validation des champs
+      if (!username.value.trim() || !password.value.trim()) {
+        alert('Veuillez remplir tous les champs');
+        return;
+      }
+
       try {
         console.log("Tentative de connexion avec :", { username: username.value, password: password.value });
-        const response = await api.post('/users/login', { username: username.value, password: password.value });
+        const response = await api.post('/users/login', { 
+          username: username.value.trim(), 
+          password: password.value.trim() 
+        });
         console.log("Nom d'utilisateur stocké :", username.value);
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('username', username.value);

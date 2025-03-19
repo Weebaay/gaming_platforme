@@ -337,25 +337,24 @@ export default {
             } else {
                 const roll = Math.floor(Math.random() * 6) + 1;
                 
-                if (player === "X") {
+                if (mode.value === "local") {
+                    setTimeout(() => {
+                        if (player === "X") {
+                            playerRoll.value = roll;
+                            playerDieImage.value = dieFaces[roll - 1];
+                        } else {
+                            opponentRoll.value = roll;
+                            opponentDieImage.value = dieFaces[roll - 1];
+                        }
+                        determineWinner();
+                    }, 1000);
+                } else if (mode.value === "ia") {
                     setTimeout(() => {
                         playerRoll.value = roll;
                         playerDieImage.value = dieFaces[roll - 1];
-                        if (mode.value === "local") {
-                            turn.value = "O";
-                        } else if (mode.value === "ia") {
-                            const iaRoll = Math.floor(Math.random() * 6) + 1;
-                            setTimeout(() => {
-                                opponentRoll.value = iaRoll;
-                                opponentDieImage.value = dieFaces[iaRoll - 1];
-                                determineWinner();
-                            }, 1000);
-                        }
-                    }, 1000);
-                } else if (player === "O") {
-                    setTimeout(() => {
-                        opponentRoll.value = roll;
-                        opponentDieImage.value = dieFaces[roll - 1];
+                        const iaRoll = Math.floor(Math.random() * 6) + 1;
+                        opponentRoll.value = iaRoll;
+                        opponentDieImage.value = dieFaces[iaRoll - 1];
                         determineWinner();
                     }, 1000);
                 }
@@ -373,22 +372,35 @@ export default {
             let winnerId = null;
             const currentUsername = localStorage.getItem('username') || 'Joueur 1';
 
+            // Vérifier si les deux joueurs ont lancé leurs dés
+            if (mode.value === "local" && (playerRoll.value === null || opponentRoll.value === null)) {
+                // Si ce n'est pas le cas, on change juste le tour
+                turn.value = turn.value === "X" ? "O" : "X";
+                return;
+            }
+
             if (playerRoll.value > opponentRoll.value) {
-                winner.value = mode.value === "ia" 
-                    ? "Vous avez gagné !" 
-                    : isHost.value 
-                        ? `${currentUsername} a gagné !` 
-                        : `${opponentName.value} a gagné !`;
+                if (mode.value === "ia") {
+                    winner.value = "Vous avez gagné !";
+                    victoiresIA.value++;
+                } else if (mode.value === "local") {
+                    winner.value = "Le Joueur 1 a gagné !";
+                    victoiresLocal.value++;
+                } else {
+                    winner.value = `${currentUsername} a gagné !`;
+                }
                 scores.player++;
                 result = 'victoire';
                 winnerId = userId.value;
                 victoiresConsecutives.value++;
             } else if (playerRoll.value < opponentRoll.value) {
-                winner.value = mode.value === "ia" 
-                    ? "L'IA a gagné !" 
-                    : isHost.value 
-                        ? `${opponentName.value} a gagné !` 
-                        : `${currentUsername} a gagné !`;
+                if (mode.value === "ia") {
+                    winner.value = "L'IA a gagné !";
+                } else if (mode.value === "local") {
+                    winner.value = "Le Joueur 2 a gagné !";
+                } else {
+                    winner.value = `${opponentName.value} a gagné !`;
+                }
                 scores.opponent++;
                 result = 'défaite';
                 winnerId = mode.value === "local" ? 0 : 0;
@@ -399,14 +411,20 @@ export default {
                 victoiresConsecutives.value = 0;
             }
 
-            if (mode.value === "local" && playerRoll.value > opponentRoll.value) {
-                victoiresLocal.value++;
-            } else if (mode.value === "ia" && playerRoll.value > opponentRoll.value) {
-                victoiresIA.value++;
+            // En mode local, on réinitialise les lancers après l'annonce du gagnant
+            if (mode.value === "local") {
+                setTimeout(() => {
+                    playerRoll.value = null;
+                    opponentRoll.value = null;
+                    turn.value = "X";
+                    winner.value = "";
+                }, 2000);
             }
 
-            saveGameResult(result, winnerId);
-            saveProgress();
+            if (mode.value !== "local") {
+                saveGameResult(result, winnerId);
+                saveProgress();
+            }
         };
 
         const saveGameResult = async (result, winnerId) => {

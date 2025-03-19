@@ -14,120 +14,177 @@
 
       <h1 class="holo-title">Pierre Feuille Ciseaux</h1>
 
-      <div class="score-display">
-        <div class="score-container player">
-          <div class="score-hologram">
-            <span class="score-value">{{ victoires }}</span>
-            <span class="score-label">JOUEUR</span>
-          </div>
+      <!-- Mode de jeu selection -->
+      <div v-if="!gameStarted" class="game-mode-selection">
+        <h2>Choisissez un mode de jeu</h2>
+        <div class="neon-buttons">
+          <button @click="startGame('solo')" class="neon-button">
+            Jouer contre l'IA
+            <div class="neon-border"></div>
+          </button>
+          <button @click="startGame('private')" class="neon-button">
+            Créer une Partie Privée
+            <div class="neon-border"></div>
+          </button>
+          <button @click="toggleJoinInput" class="neon-button">
+            Rejoindre une Partie
+            <div class="neon-border"></div>
+          </button>
         </div>
-        <div class="vs-hologram">VS</div>
-        <div class="score-container computer">
-          <div class="score-hologram">
-            <span class="score-value">{{ defaites }}</span>
-            <span class="score-label">IA</span>
-          </div>
-        </div>
-      </div>
 
-      <button @click="mettreScoreZero" class="reset-button">
-        <span class="reset-icon">↺</span>
-        <span class="reset-text">Réinitialiser le score</span>
-        <div class="reset-ring"></div>
-      </button>
-
-      <div class="game-state" v-if="monChoix && choixIA">
-        <div class="player-choice">
-          <div class="choice-display">
-            <div class="hologram-symbol player">
-              <span v-if="monChoix === 'pierre'">✊</span>
-              <span v-if="monChoix === 'feuille'">✋</span>
-              <span v-if="monChoix === 'ciseaux'">✌️</span>
-            </div>
-            <span class="choice-label">Votre choix</span>
-          </div>
+        <div v-if="showJoinInput" class="join-section">
+          <input v-model="joinCode" placeholder="Entrez le code de la partie" class="neon-input" />
+          <button @click="joinGame" class="neon-button">
+            Rejoindre
+            <div class="neon-border"></div>
+            </button>
         </div>
-        <div class="vs-animation">VS</div>
-        <div class="ia-choice">
-          <div class="choice-display">
-            <div class="hologram-symbol ia">
-              <span v-if="choixIA === 'pierre'">✊</span>
-              <span v-if="choixIA === 'feuille'">✋</span>
-              <span v-if="choixIA === 'ciseaux'">✌️</span>
-            </div>
-            <span class="choice-label">Choix de l'IA</span>
-          </div>
+
+        <div v-if="isHost" class="host-section">
+          <p>Partagez ce code avec votre ami pour qu'il rejoigne :</p>
+          <p class="code neon-text">{{ gameCode }}</p>
         </div>
       </div>
 
-      <div class="choices-container">
-        <button 
-          v-for="choice in ['pierre', 'feuille', 'ciseaux']" 
-          :key="choice"
-          @click="jouer(choice)"
-          class="choice-btn"
-          :class="choice"
-        >
-          <div class="hologram-symbol">
-            <span v-if="choice === 'pierre'">✊</span>
-            <span v-if="choice === 'feuille'">✋</span>
-            <span v-if="choice === 'ciseaux'">✌️</span>
-          </div>
-          <div class="hologram-ring"></div>
-        </button>
-      </div>
-
-      <div v-if="victoiresConsecutives > 2" class="streak-counter">
-        Série: {{ victoiresConsecutives }} 🔥
-      </div>
-
-      <div class="result-hologram" :class="{ 
-        visible: resultatVisible,
-        victoire: resultatPartie === 'Victoire !',
-        defaite: resultatPartie === 'Défaite !',
-        egalite: resultatPartie === 'Égalité !'
-      }">
-        <div class="result-content">{{ resultatPartie }}</div>
-      </div>
-
-      <!-- Effet spécial pour les séries -->
-      <div v-if="showSpecialEffect" class="special-effect">
-        <div class="special-text">INCROYABLE !</div>
-        <div class="special-stars"></div>
-      </div>
-
-      <!-- Historique des coups -->
-      <div class="history-container">
-        <div class="history-title">Historique</div>
-        <div class="history-list">
-          <div v-for="(coup, index) in historique" 
-               :key="index" 
-               class="history-item"
-               :class="coup.resultat">
-            <div class="history-symbols">
-              <span class="history-player">
-                <span v-if="coup.joueur === 'pierre'">✊</span>
-                <span v-if="coup.joueur === 'feuille'">✋</span>
-                <span v-if="coup.joueur === 'ciseaux'">✌️</span>
-              </span>
-              <span class="history-vs">VS</span>
-              <span class="history-ia">
-                <span v-if="coup.ia === 'pierre'">✊</span>
-                <span v-if="coup.ia === 'feuille'">✋</span>
-                <span v-if="coup.ia === 'ciseaux'">✌️</span>
-              </span>
+      <!-- Contenu du jeu existant -->
+      <div v-else>
+        <div class="score-display">
+          <div class="score-container player">
+            <div class="score-hologram">
+              <span class="score-value">{{ victoires }}</span>
+              <span class="score-label">JOUEUR</span>
             </div>
           </div>
+          <div class="vs-hologram">VS</div>
+          <div class="score-container computer">
+            <div class="score-hologram">
+              <span class="score-value">{{ defaites }}</span>
+              <span class="score-label">{{ isMultiplayer ? 'ADVERSAIRE' : 'IA' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <button @click="mettreScoreZero" class="reset-button">
+          <span class="reset-icon">↺</span>
+          <span class="reset-text">Réinitialiser le score</span>
+          <div class="reset-ring"></div>
+            </button>
+
+        <div class="game-state" v-if="monChoix && (isMultiplayer ? true : choixIA)">
+          <div class="player-choice">
+            <div class="choice-display">
+              <div class="hologram-symbol player">
+                <span v-if="monChoix === 'pierre'">✊</span>
+                <span v-if="monChoix === 'feuille'">✋</span>
+                <span v-if="monChoix === 'ciseaux'">✌️</span>
+              </div>
+              <span class="choice-label">Votre choix</span>
+            </div>
+          </div>
+          <div class="vs-animation">VS</div>
+          <div class="ia-choice">
+            <div class="choice-display">
+              <div class="hologram-symbol ia">
+                <span v-if="choixIA === 'pierre'">✊</span>
+                <span v-if="choixIA === 'feuille'">✋</span>
+                <span v-if="choixIA === 'ciseaux'">✌️</span>
+              </div>
+              <span class="choice-label">{{ isMultiplayer ? 'Choix Adversaire' : 'Choix de l\'IA' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="choices-container">
+          <button 
+            v-for="choice in ['pierre', 'feuille', 'ciseaux']" 
+            :key="choice"
+            @click="jouer(choice)"
+            class="choice-btn"
+            :class="[choice, { 
+                disabled: isMultiplayer && (
+                    (playerSymbol === 'X' && gameState !== 'player1Turn') ||
+                    (playerSymbol === 'O' && gameState !== 'player2Turn') ||
+                    waitingForOpponent ||
+                    gameState === 'waitingForPlayer2'
+                )
+            }]"
+            :disabled="isMultiplayer && (
+                (playerSymbol === 'X' && gameState !== 'player1Turn') ||
+                (playerSymbol === 'O' && gameState !== 'player2Turn') ||
+                waitingForOpponent ||
+                gameState === 'waitingForPlayer2'
+            )"
+          >
+            <div class="hologram-symbol">
+              <span v-if="choice === 'pierre'">✊</span>
+              <span v-if="choice === 'feuille'">✋</span>
+              <span v-if="choice === 'ciseaux'">✌️</span>
+            </div>
+            <div class="hologram-ring"></div>
+            </button>
+        </div>
+
+        <div v-if="waitingForOpponent && gameState !== 'complete'" class="waiting-message">
+          En attente du choix de l'adversaire...
+        </div>
+
+        <div v-if="victoiresConsecutives > 2" class="streak-counter">
+          Série: {{ victoiresConsecutives }} 🔥
+        </div>
+
+        <div class="result-hologram" :class="{ 
+          visible: resultatVisible,
+          victoire: resultatPartie === 'Victoire !',
+          defaite: resultatPartie === 'Défaite !',
+          egalite: resultatPartie === 'Égalité !'
+        }">
+          <div class="result-content">{{ resultatPartie }}</div>
+        </div>
+
+        <!-- Effet spécial pour les séries -->
+        <div v-if="showSpecialEffect" class="special-effect">
+          <div class="special-text">INCROYABLE !</div>
+          <div class="special-stars"></div>
+        </div>
+
+        <!-- Historique des coups -->
+        <div class="history-container">
+          <div class="history-title">Historique</div>
+          <div class="history-list">
+            <div v-for="(coup, index) in historique" 
+                 :key="index" 
+                 class="history-item"
+                 :class="coup.resultat">
+              <div class="history-symbols">
+                <span class="history-player">
+                  <span v-if="coup.joueur === 'pierre'">✊</span>
+                  <span v-if="coup.joueur === 'feuille'">✋</span>
+                  <span v-if="coup.joueur === 'ciseaux'">✌️</span>
+                </span>
+                <span class="history-vs">VS</span>
+                <span class="history-ia">
+                  <span v-if="coup.ia === 'pierre'">✊</span>
+                  <span v-if="coup.ia === 'feuille'">✋</span>
+                  <span v-if="coup.ia === 'ciseaux'">✌️</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="gameMessage" class="game-message">
+          {{ gameMessage }}
         </div>
       </div>
     </div>
-  </div>
+    </div>
 </template>
-
+  
 <script>
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import api from "../services/api";
 import { decodeJWT } from '@/util/utils';
+import { io } from 'socket.io-client';
 
 export default {
   name: "PierreFeuilleCiseaux",
@@ -146,6 +203,19 @@ export default {
     const winnerId = ref(null);
     const historique = ref([]);
     const showSpecialEffect = ref(false);
+
+    const gameStarted = ref(false);
+    const isMultiplayer = ref(false);
+    const isHost = ref(false);
+    const showJoinInput = ref(false);
+    const gameCode = ref("");
+    const joinCode = ref("");
+    const socket = ref(null);
+    const playerSymbol = ref("X");
+    const sessionID = ref("");
+    const gameState = ref("");
+    const gameMessage = ref("");
+    const waitingForOpponent = ref(false);
 
     const userId =  computed(() => {
         const token = localStorage.getItem('token');
@@ -251,8 +321,32 @@ export default {
         };
 
         // Lancement du jeu
-        const jouer = (monChoix_) => {
-            monChoix.value = monChoix_;
+        const jouer = async (choice) => {
+            if (isMultiplayer.value) {
+                // Vérifier si c'est notre tour
+                const isMyTurn = (playerSymbol.value === "X" && gameState.value === "player1Turn") ||
+                               (playerSymbol.value === "O" && gameState.value === "player2Turn");
+                
+                if (!isMyTurn) {
+                    alert("Ce n'est pas votre tour !");
+                    return;
+                }
+
+                socket.value.emit('makeRPTurn', {
+                    sessionId: sessionID.value,
+                    choice: choice,
+                    player: playerSymbol.value
+                }, (response) => {
+                    if (response.error) {
+                        console.error('Erreur:', response.error);
+                        alert(response.error);
+                    } else {
+                        monChoix.value = choice;
+                        waitingForOpponent.value = true;
+                    }
+                });
+            } else {
+                monChoix.value = choice;
             choixIA.value = choisirIA();
             let result;
             let winnerId_ = null;
@@ -283,30 +377,31 @@ export default {
                 victoiresConsecutives.value = 0;
                  saveProgress();
             }
-          
-            // Ajouter le coup à l'historique
-            historique.value.unshift({
-              joueur: monChoix.value,
-              ia: choixIA.value,
-              resultat: result,
-              timestamp: Date.now()
-            });
-            
-            // Garder seulement les 5 derniers coups
-            if (historique.value.length > 5) {
-              historique.value.pop();
-            }
+              
+                // Ajouter le coup à l'historique
+                historique.value.unshift({
+                  joueur: monChoix.value,
+                  ia: choixIA.value,
+                  resultat: result,
+                  timestamp: Date.now()
+                });
+                
+                // Garder seulement les 5 derniers coups
+                if (historique.value.length > 5) {
+                  historique.value.pop();
+                }
 
-            // Animation spéciale pour 5 victoires consécutives
-            if (victoiresConsecutives.value >= 5) {
-              showSpecialEffect.value = true;
-              setTimeout(() => {
-                showSpecialEffect.value = false;
-              }, 3000);
-            }
+                // Animation spéciale pour 5 victoires consécutives
+                if (victoiresConsecutives.value >= 5) {
+                  showSpecialEffect.value = true;
+                  setTimeout(() => {
+                    showSpecialEffect.value = false;
+                  }, 3000);
+                }
 
-            saveGameResult(result, winnerId.value);
-            afficherResultat();
+           saveGameResult(result, winnerId.value);
+           afficherResultat();
+            }
         };
 
      const mettreScoreZero = () => {
@@ -319,8 +414,141 @@ export default {
         };
 
     onMounted(() => {
-        loadProgress()
+        socket.value = io('http://localhost:3000');
+        
+        socket.value.on('connect', () => {
+          console.log('Connecté au serveur WebSocket avec l\'ID:', socket.value.id);
+        });
+
+        socket.value.on('disconnect', () => {
+          console.log('Déconnecté du serveur WebSocket');
+        });
+
+        socket.value.on('gameStateUpdate', (data) => {
+            gameState.value = data.gameState;
+            gameMessage.value = data.message;
+            
+            // Réinitialiser les choix et l'état d'attente si on commence un nouveau tour
+            if (data.gameState === "player1Turn") {
+                monChoix.value = "";
+                choixIA.value = "";
+                resultatVisible.value = false;
+                waitingForOpponent.value = false; // Réinitialiser l'état d'attente
+            }
+        });
+
+        socket.value.on('updateRPSGame', (data) => {
+            console.log('Mise à jour du jeu reçue:', data);
+            
+            if (data.gameState === "complete" && data.choices) {
+                // Afficher les choix des deux joueurs
+                if (playerSymbol.value === "X") {
+                    monChoix.value = data.choices.player1;
+                    choixIA.value = data.choices.player2;
+                } else {
+                    monChoix.value = data.choices.player2;
+                    choixIA.value = data.choices.player1;
+                }
+
+                // Déterminer le résultat pour ce joueur
+                if (data.winner === "draw") {
+                    resultatPartie.value = "Égalité !";
+                    egalites.value++;
+                    victoiresConsecutives.value = 0;
+                } else if (
+                    (playerSymbol.value === "X" && data.winner === "player1") ||
+                    (playerSymbol.value === "O" && data.winner === "player2")
+                ) {
+                    resultatPartie.value = "Victoire !";
+                    victoires.value++;
+                    victoiresConsecutives.value++;
+                    
+                    if (victoiresConsecutives.value >= 5) {
+                        showSpecialEffect.value = true;
+                        setTimeout(() => {
+                            showSpecialEffect.value = false;
+                        }, 3000);
+                    }
+                } else {
+                    resultatPartie.value = "Défaite !";
+                    defaites.value++;
+                    victoiresConsecutives.value = 0;
+                }
+
+                // Ajouter à l'historique
+                historique.value.unshift({
+                    joueur: monChoix.value,
+                    ia: choixIA.value,
+                    resultat: resultatPartie.value === "Victoire !" ? "victoire" :
+                             resultatPartie.value === "Défaite !" ? "defaite" : "egalite",
+                    timestamp: Date.now()
+                });
+
+                // Garder seulement les 5 derniers coups
+                if (historique.value.length > 5) {
+                    historique.value.pop();
+                }
+
+                resultatVisible.value = true;
+                waitingForOpponent.value = false; // Réinitialiser l'état d'attente à la fin de la manche
+
+                setTimeout(() => {
+                    resultatVisible.value = false;
+                }, 2000);
+            }
+        });
     })
+
+    const startGame = async (mode) => {
+      gameStarted.value = true;
+      
+      if (mode === 'solo') {
+        isMultiplayer.value = false;
+        const sessionId = 'S' + Math.random().toString(36).substring(2, 15);
+        sessionID.value = sessionId;
+      } else if (mode === 'private') {
+        isMultiplayer.value = true;
+        isHost.value = true;
+        playerSymbol.value = "X";
+        gameState.value = "waitingForPlayer2";
+        socket.value.emit('createRPSession', (sessionId) => {
+          gameCode.value = sessionId;
+          sessionID.value = sessionId;
+          console.log("Session ID stocké:", sessionId);
+          alert(`Code de la partie: ${sessionId}`);
+        });
+      }
+    };
+
+    const toggleJoinInput = () => {
+      showJoinInput.value = !showJoinInput.value;
+    };
+
+    const joinGame = () => {
+      if (!joinCode.value) {
+        alert("Veuillez entrer un code de partie !");
+        return;
+      }
+
+      socket.value.emit('joinRPSession', joinCode.value, (response) => {
+        if (response.success) {
+          gameStarted.value = true;
+          isMultiplayer.value = true;
+          playerSymbol.value = "O";
+          sessionID.value = joinCode.value;
+          gameState.value = "player1Turn";
+          alert("Rejoint avec succès !");
+        } else {
+          alert(response.message || "Impossible de rejoindre cette partie.");
+        }
+      });
+    };
+
+    onUnmounted(() => {
+      if (socket.value) {
+        socket.value.disconnect();
+      }
+    });
 
     return {
       monChoix,
@@ -337,7 +565,19 @@ export default {
       jouer,
       userId,
       historique,
-      showSpecialEffect
+      showSpecialEffect,
+      gameStarted,
+      isMultiplayer,
+      isHost,
+      showJoinInput,
+      gameCode,
+      joinCode,
+      startGame,
+      toggleJoinInput,
+      joinGame,
+      gameState,
+      gameMessage,
+      waitingForOpponent
     };
   },
 };
@@ -597,6 +837,23 @@ export default {
     0 0 20px rgba(0, 191, 255, 0.2) inset;
 }
 
+.choice-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.choice-btn.disabled:hover .hologram-symbol {
+  transform: none;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: none;
+}
+
+.choice-btn.disabled:hover .hologram-ring {
+  border-color: rgba(0, 191, 255, 0.3);
+  box-shadow: none;
+  transform: none;
+}
+
 .result-hologram {
   position: fixed;
   top: 50%;
@@ -676,7 +933,7 @@ export default {
     opacity: 0.8;
   }
   50% {
-    transform: scale(1.1);
+  transform: scale(1.1);
     opacity: 1;
   }
 }
@@ -687,7 +944,7 @@ export default {
     transform: translateY(20px);
   }
   to {
-    opacity: 1;
+      opacity: 1;
     transform: translateY(0);
   }
 }
@@ -989,5 +1246,134 @@ export default {
     font-size: 3rem;
   }
 }
+
+/* Styles pour la sélection du mode de jeu */
+.game-mode-selection {
+  text-align: center;
+  margin: 2rem auto;
+  max-width: 800px;
+  position: relative;
+  z-index: 2;
+}
+
+.neon-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.neon-button {
+  position: relative;
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  color: white;
+  background: rgba(138, 43, 226, 0.1);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 
+      0 0 10px rgba(138, 43, 226, 0.3),
+      0 0 20px rgba(138, 43, 226, 0.2),
+      0 0 30px rgba(138, 43, 226, 0.1);
+}
+
+.neon-button:hover {
+  background: rgba(0, 191, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 
+      0 0 15px rgba(0, 191, 255, 0.4),
+      0 0 30px rgba(0, 191, 255, 0.3),
+      0 0 45px rgba(0, 191, 255, 0.2);
+}
+
+.neon-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  animation: neonBorder 1.5s ease-in-out infinite;
+}
+
+.neon-input {
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  color: white;
+  background: rgba(138, 43, 226, 0.1);
+  border: 2px solid #8a2be2;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  width: 100%;
+  max-width: 300px;
+  transition: all 0.3s ease;
+}
+
+.neon-input:focus {
+  outline: none;
+  border-color: #00bfff;
+  box-shadow: 
+      0 0 10px rgba(0, 191, 255, 0.4),
+      0 0 20px rgba(0, 191, 255, 0.2);
+}
+
+.join-section, .host-section {
+  margin-top: 2rem;
+}
+
+.code {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #8a2be2;
+  text-shadow: 
+      0 0 10px #8a2be2,
+      0 0 20px #8a2be2;
+  margin: 1rem 0;
+}
+
+@keyframes neonBorder {
+  0%, 100% {
+    border-color: #8a2be2;
+    box-shadow: 
+        0 0 10px #8a2be2,
+        0 0 20px #8a2be2;
+  }
+  50% {
+    border-color: #00bfff;
+    box-shadow: 
+        0 0 10px #00bfff,
+        0 0 20px #00bfff;
+  }
+}
+
+.waiting-message {
+  text-align: center;
+  margin: 2rem 0;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+      opacity: 1;
+  }
+}
+
+.game-message {
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 1.2rem;
+  color: #00bfff;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+  }
 </style>
   

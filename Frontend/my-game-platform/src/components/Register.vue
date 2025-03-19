@@ -44,11 +44,31 @@ export default {
     const router = useRouter();
 
     const handleRegister = async () => {
+      // Validation des champs
+      if (!username.value.trim() || !password.value.trim()) {
+        alert('Veuillez remplir tous les champs');
+        return;
+      }
+
       try {
-        console.log('Données envoyées :', { username: username.value, password: password.value });
-        await api.post('/register', { username: username.value, password: password.value });
+        console.log('Données envoyées :', { 
+          username: username.value.trim(), 
+          password: password.value.trim() 
+        });
+        
+        await api.post('/users/register', { 
+          username: username.value.trim(), 
+          password: password.value.trim() 
+        });
+        
         alert("Inscription réussie !");
-        router.push('/login');
+        
+        // Réinitialiser les champs
+        username.value = '';
+        password.value = '';
+        
+        // Redirection vers la page de connexion
+        await router.push('/login');
       } catch (error) {
         console.error('Erreur lors de l\'inscription :', error.response || error);
         alert("Erreur lors de l'inscription. Réessayez.");

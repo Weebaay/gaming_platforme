@@ -53,10 +53,8 @@ module.exports = function configureWebSockets(server) {
     });
 
     io.on('connection', (socket) => {
-        console.log(`User Connected: ${socket.id}`);
 
         socket.on("disconnect", () => {
-            console.log("User Disconnected", socket.id);
              // Supprimer le joueur de toutes les sessions (simple iteration)
             for (const sessionId in gameSessions) {
                 if (gameSessions.hasOwnProperty(sessionId)) {
@@ -100,23 +98,60 @@ module.exports = function configureWebSockets(server) {
             callback({ success: true });
         });
 
-        socket.on('makeMove', (data) => {
+        socket.on('makeMove', (data, callback) => {
             const { sessionId, index, player } = data;
-            if (!gameSessions[sessionId]) return;
+            if (!gameSessions[sessionId]) {
+                callback({ error: 'Session non trouvée' });
+                return;
+            }
+            
             const session = gameSessions[sessionId];
-            if (session.currentPlayer !== player || session.grid[index]) return;
-
+            
+            // Vérifier si c'est bien le tour du joueur
+            if (session.currentPlayer !== player) {
+                callback({ error: 'Ce n\'est pas votre tour' });
+                return;
+            }
+            
+            // Vérifier si le joueur est bien celui qu'il prétend être
+            const playerInSession = session.players.find(p => p.socketId === socket.id && p.symbol === player);
+            if (!playerInSession) {
+                callback({ error: 'Joueur non autorisé' });
+                return;
+            }
+            
+            // Vérifier si la case est libre
+            if (session.grid[index]) {
+                callback({ error: 'Case déjà occupée' });
+                return;
+            }
+            
+            // Effectuer le coup
             session.grid[index] = player;
             const winner = checkWinner(session.grid);
-
+            
+            // Envoyer la mise à jour à tous les joueurs
             if (winner) {
-                io.to(sessionId).emit('updateGame', { grid: session.grid, winner });
+                io.to(sessionId).emit('updateGame', { 
+                    grid: session.grid, 
+                    winner,
+                    currentPlayer: session.currentPlayer
+                });
             } else if (!session.grid.includes("")) {
-                io.to(sessionId).emit('updateGame', { grid: session.grid, draw: true });
+                io.to(sessionId).emit('updateGame', { 
+                    grid: session.grid, 
+                    draw: true,
+                    currentPlayer: session.currentPlayer
+                });
             } else {
                 session.currentPlayer = player === "X" ? "O" : "X";
-                io.to(sessionId).emit('updateGame', { grid: session.grid, currentPlayer: session.currentPlayer });
+                io.to(sessionId).emit('updateGame', { 
+                    grid: session.grid, 
+                    currentPlayer: session.currentPlayer
+                });
             }
+            
+            callback({ success: true });
         });
 
         // Jeu des Dés
@@ -183,5 +218,120 @@ module.exports = function configureWebSockets(server) {
                 io.to(sessionId).emit('updateDiceGame', { scores: session.scores, currentPlayer: session.currentPlayer, rolls: session.rolls });
             }
         });
+
+        // Pierre-Feuille-Ciseaux
+        socket.on('createRPSession', (callback) => {
+            const sessionId = generateInvitationCode();
+            gameSessions[sessionId] = {
+                players: [{ socketId: socket.id, symbol: "X" }],
+                choices: { player1: null, player2: null },
+                currentPlayer: "X",
+                gameState: "waitingForPlayer2", // États possibles: waitingForPlayer2, player1Turn, player2Turn, complete
+            };
+            console.log(`Session de Pierre-Feuille-Ciseaux créée avec l'ID : ${sessionId}`);
+            socket.join(sessionId);
+            callback(sessionId);
+        });
+
+        socket.on('joinRPSession', (sessionId, callback) => {
+            if (!gameSessions[sessionId]) {
+                callback({ success: false, message: 'Session non trouvée' });
+                return;
+            }
+            if (gameSessions[sessionId].players.length >= 2) {
+                callback({ success: false, message: 'Session complète' });
+                return;
+            }
+            
+            gameSessions[sessionId].players.push({ socketId: socket.id, symbol: "O" });
+            gameSessions[sessionId].gameState = "player1Turn";
+            socket.join(sessionId);
+            
+            // Notifier les deux joueurs que la partie peut commencer
+            io.to(sessionId).emit('gameStateUpdate', { 
+                gameState: "player1Turn",
+                message: "La partie commence ! Au tour du Joueur 1"
+            });
+            
+            console.log(`Le joueur ${socket.id} a rejoint la session de Pierre-Feuille-Ciseaux ${sessionId}`);
+            callback({ success: true });
+        });
+
+        socket.on('makeRPTurn', (data, callback) => {
+            const { sessionId, choice, player } = data;
+            if (!gameSessions[sessionId]) {
+                callback({ error: 'Session non trouvée' });
+                return;
+            }
+            
+            const session = gameSessions[sessionId];
+            
+            // Vérifier si c'est le bon tour
+            if (session.gameState === "player1Turn" && player !== "X") {
+                callback({ error: 'Ce n\'est pas votre tour' });
+                return;
+            }
+            if (session.gameState === "player2Turn" && player !== "O") {
+                callback({ error: 'Ce n\'est pas votre tour' });
+                return;
+            }
+            
+            // Vérifier si le joueur est bien celui qu'il prétend être
+            const playerInSession = session.players.find(p => p.socketId === socket.id && p.symbol === player);
+            if (!playerInSession) {
+                callback({ error: 'Joueur non autorisé' });
+                return;
+            }
+
+            // Enregistrer le choix du joueur
+            if (player === "X") {
+                session.choices.player1 = choice;
+                session.gameState = "player2Turn";
+                // Notifier les joueurs du changement de tour
+                io.to(sessionId).emit('gameStateUpdate', {
+                    gameState: "player2Turn",
+                    message: "Au tour du Joueur 2"
+                });
+            } else {
+                session.choices.player2 = choice;
+                session.gameState = "complete";
+                
+                // Déterminer le gagnant et envoyer les résultats
+                const winner = determineRPSWinner(session.choices.player1, session.choices.player2);
+                io.to(sessionId).emit('updateRPSGame', { 
+                    choices: session.choices,
+                    winner,
+                    gameState: "complete"
+                });
+
+                // Réinitialiser pour le prochain tour
+                setTimeout(() => {
+                    session.choices = { player1: null, player2: null };
+                    session.gameState = "player1Turn";
+                    io.to(sessionId).emit('gameStateUpdate', {
+                        gameState: "player1Turn",
+                        message: "Nouveau tour ! Au tour du Joueur 1"
+                    });
+                }, 3000);
+            }
+
+            callback({ success: true });
+        });
+
+        /**
+         * Détermine le gagnant du jeu Pierre-Feuille-Ciseaux
+         * @param {string} choice1 - Choix du joueur 1.
+         * @param {string} choice2 - Choix du joueur 2.
+         * @returns {string} Symbole du gagnant ("X", "O" ou "draw").
+         */
+        function determineRPSWinner(choice1, choice2) {
+            if (choice1 === choice2) return "draw";
+            if ((choice1 === "pierre" && choice2 === "ciseaux") ||
+                (choice1 === "ciseaux" && choice2 === "feuille") ||
+                (choice1 === "feuille" && choice2 === "pierre")) {
+                return "player1";
+            }
+            return "player2";
+        }
     });
 };

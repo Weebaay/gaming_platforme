@@ -5,9 +5,6 @@
 
 require('dotenv').config();
 
-console.log("PORT:", process.env.PORT);
-console.log("JWT_SECRET:", process.env.JWT_SECRET);
-console.log("ADMIN_SECRET:", process.env.ADMIN_SECRET);
 
 const express = require('express');
 const cors = require('cors');
