@@ -57,7 +57,7 @@
                     {{ cell }}
                 </div>
             </div>
-            <button @click="resetGame">Retourquel sont les dernier fichier que nous avons modifier a fin de les sauvegarder sur git</button>
+            <button @click="resetGame">Retour</button>
         </div>
     </div>
 </template>
