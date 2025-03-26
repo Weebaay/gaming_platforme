@@ -8,12 +8,26 @@ const { Server } = require("socket.io");
 // Stockage en mémoire des sessions de jeu (comme dans le server.js original)
 const gameSessions = {};
 
+// Durée de validité d'une session en millisecondes (30 minutes)
+const SESSION_EXPIRATION_TIME = 30 * 60 * 1000;
+
 /**
  * Génère un code d'invitation unique pour une session.
  * @returns {string} Code unique à 6 caractères.
  */
 function generateInvitationCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+/**
+ * Vérifie si une session a expiré
+ * @param {Object} session - Session de jeu à vérifier
+ * @returns {boolean} True si la session a expiré, false sinon
+ */
+function isSessionExpired(session) {
+    if (!session || !session.createdAt) return true;
+    const now = Date.now();
+    return (now - session.createdAt) > SESSION_EXPIRATION_TIME;
 }
 
 /**
@@ -76,6 +90,7 @@ module.exports = function configureWebSockets(server) {
                 players: [{ socketId: socket.id, symbol: "X" }],
                 grid: Array(9).fill(""),
                 currentPlayer: "X",
+                createdAt: Date.now()  // Ajout du timestamp de création
             };
             console.log(`Session de Morpion créée avec l'ID : ${sessionId}`);
             socket.join(sessionId);
@@ -87,6 +102,14 @@ module.exports = function configureWebSockets(server) {
                 callback({ success: false, message: 'Session non trouvée' });
                 return;
             }
+            
+            // Vérifier si la session a expiré
+            if (isSessionExpired(gameSessions[sessionId])) {
+                delete gameSessions[sessionId]; // Supprimer la session expirée
+                callback({ success: false, message: 'Session expirée' });
+                return;
+            }
+            
             if (gameSessions[sessionId].players.length >= 2) {
                 callback({ success: false, message: 'Session complète' });
                 return;
@@ -162,6 +185,7 @@ module.exports = function configureWebSockets(server) {
                 scores: { player1: 0, player2: 0 },
                 currentPlayer: "X",
                 rolls: { player1: null, player2: null },
+                createdAt: Date.now()  // Ajout du timestamp de création
             };
             console.log(`Session de dés créée avec l'ID : ${sessionId}`);
             socket.join(sessionId);
@@ -173,6 +197,14 @@ module.exports = function configureWebSockets(server) {
                 callback({ success: false, message: 'Session non trouvée' });
                 return;
             }
+            
+            // Vérifier si la session a expiré
+            if (isSessionExpired(gameSessions[sessionId])) {
+                delete gameSessions[sessionId]; // Supprimer la session expirée
+                callback({ success: false, message: 'Session expirée' });
+                return;
+            }
+            
             if (gameSessions[sessionId].players.length >= 2) {
                 callback({ success: false, message: 'Session complète' });
                 return;
@@ -227,6 +259,7 @@ module.exports = function configureWebSockets(server) {
                 choices: { player1: null, player2: null },
                 currentPlayer: "X",
                 gameState: "waitingForPlayer2", // États possibles: waitingForPlayer2, player1Turn, player2Turn, complete
+                createdAt: Date.now()  // Ajout du timestamp de création
             };
             console.log(`Session de Pierre-Feuille-Ciseaux créée avec l'ID : ${sessionId}`);
             socket.join(sessionId);
@@ -238,6 +271,14 @@ module.exports = function configureWebSockets(server) {
                 callback({ success: false, message: 'Session non trouvée' });
                 return;
             }
+            
+            // Vérifier si la session a expiré
+            if (isSessionExpired(gameSessions[sessionId])) {
+                delete gameSessions[sessionId]; // Supprimer la session expirée
+                callback({ success: false, message: 'Session expirée' });
+                return;
+            }
+            
             if (gameSessions[sessionId].players.length >= 2) {
                 callback({ success: false, message: 'Session complète' });
                 return;
@@ -334,4 +375,7 @@ module.exports = function configureWebSockets(server) {
             return "player2";
         }
     });
+
+    // Exposer l'objet gameSessions pour le nettoyage périodique
+    return { gameSessions };
 };

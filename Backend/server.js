@@ -15,6 +15,8 @@ const sessions = require('express-session');
 const MySQLStore = require('express-mysql-session')(sessions);
 const http = require('http');
 const configureWebSockets = require('./routes/WebSocket'); // Importe la configuration WebSocket
+const { startPeriodicCleaning } = require('./cron/sessionCleaner'); // Importe le nettoyeur de sessions
+const { globalLimiter } = require('./middlewares/rateLimiter'); // Importe le limiteur global
 
 
 const app = express();
@@ -49,6 +51,10 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Appliquer le middleware de rate limiting global à toutes les routes
+app.use(globalLimiter);
+console.log(chalk.yellow('🛡️ Protection contre les attaques par force brute activée'));
 
 const gameRoutes = require('./routes/games');
 const userRoutes = require('./routes/users');
@@ -109,8 +115,16 @@ app.use((err, req, res, next) => {
 const server = http.createServer(app);
 
 // Configure les WebSockets (utilise le fichier websocket.js)
-configureWebSockets(server);
+const webSocketHandler = configureWebSockets(server);
 
+// Récupérer l'objet des sessions de jeu du module WebSocket
+// Pour cela, nous modifierions légèrement le fichier WebSocket.js pour exposer l'objet gameSessions
+// Dans cet exemple, nous supposons que webSocketHandler contient cet objet
+if (webSocketHandler && webSocketHandler.gameSessions) {
+    // Démarrer le nettoyage périodique des sessions expirées (toutes les 5 minutes)
+    startPeriodicCleaning(webSocketHandler.gameSessions, 5);
+    console.log(chalk.yellow('🧹 Nettoyage automatique des sessions configuré (toutes les 5 minutes)'));
+}
 
 server.listen(PORT, () => {
     console.log(chalk.green(`✅ Serveur en écoute sur le port ${PORT}`));

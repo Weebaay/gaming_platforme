@@ -26,14 +26,22 @@ const User = {
      * @param {Object} userData - L'objet contenant les informations de l'utilisateur
      * @param {string} userData.username - Nom d'utilisateur
      * @param {string} userData.password - Mot de passe
+     * @param {string} [userData.email] - Email (optionnel)
      * @param {function} callback - Fonction de callback pour gérer le résultat
      */
     create: async (userData, callback) => {
         try {
             const hashedPassword = await generatePasswordHash(userData.password);
-            const query = 'INSERT INTO users (username, password) VALUES (?, ?)';
+            const query = userData.email 
+                ? 'INSERT INTO users (username, password, email) VALUES (?, ?, ?)'
+                : 'INSERT INTO users (username, password) VALUES (?, ?)';
+            
+            const params = userData.email 
+                ? [userData.username, hashedPassword, userData.email]
+                : [userData.username, hashedPassword];
+            
             if (typeof callback === 'function') {
-                connection.query(query, [userData.username, hashedPassword], callback);
+                connection.query(query, params, callback);
             } else {
                 throw new TypeError('Callback manquant ou invalide dans la méthode create.');
             }
@@ -59,6 +67,26 @@ const User = {
 
         const query = 'SELECT * FROM users WHERE username = ?';
         connection.query(query, [username], (err, results) => {
+            if (err) {
+                return callback(err);
+            }
+            callback(null, results[0]); // Retourne le premier résultat ou null
+        });
+    },
+
+    /**
+     * @function getByEmail
+     * @description Fonction pour récupérer un utilisateur par son email
+     * @param {string} email - Email de l'utilisateur
+     * @param {function} callback - Fonction de callback pour gérer le résultat
+     */
+    getByEmail: (email, callback) => {
+        if (typeof callback !== 'function') {
+            throw new TypeError('Callback manquant ou invalide dans la méthode getByEmail.');
+        }
+
+        const query = 'SELECT * FROM users WHERE email = ?';
+        connection.query(query, [email], (err, results) => {
             if (err) {
                 return callback(err);
             }
@@ -125,7 +153,7 @@ const User = {
             throw new TypeError('Callback manquant ou invalide dans la méthode getById.');
         }
 
-        const query = 'SELECT id, username FROM users WHERE id = ?';
+        const query = 'SELECT id, username, email FROM users WHERE id = ?';
         connection.query(query, [id], (err, results) => {
             if (err) {
                 return callback(err);
@@ -143,10 +171,39 @@ const User = {
      */
     update: async (id, userData, callback) => {
         try {
-            const hashedPassword = await generatePasswordHash(userData.password);
-            const query = 'UPDATE users SET username = ?, password = ? WHERE id = ?';
+            // Construction de la requête selon les champs à mettre à jour
+            let query = 'UPDATE users SET ';
+            const params = [];
+            const fields = [];
+
+            // Ajouter les champs à mettre à jour
+            if (userData.username) {
+                fields.push('username = ?');
+                params.push(userData.username);
+            }
+            
+            if (userData.password) {
+                const hashedPassword = await generatePasswordHash(userData.password);
+                fields.push('password = ?');
+                params.push(hashedPassword);
+            }
+            
+            if (userData.email) {
+                fields.push('email = ?');
+                params.push(userData.email);
+            }
+            
+            // S'assurer qu'il y a des champs à mettre à jour
+            if (fields.length === 0) {
+                return callback(new Error('Aucun champ à mettre à jour'));
+            }
+            
+            // Compléter la requête
+            query += fields.join(', ') + ' WHERE id = ?';
+            params.push(id);
+            
             if (typeof callback === 'function') {
-                connection.query(query, [userData.username, hashedPassword, id], callback);
+                connection.query(query, params, callback);
             } else {
                 throw new TypeError('Callback manquant ou invalide dans la méthode update.');
             }
@@ -157,6 +214,48 @@ const User = {
                 throw error;
             }
         }
+    },
+
+    /**
+     * @function updatePassword
+     * @description Fonction spécifique pour mettre à jour le mot de passe d'un utilisateur
+     * @param {number} id - ID de l'utilisateur
+     * @param {string} newPassword - Nouveau mot de passe
+     * @param {function} callback - Fonction de callback pour gérer le résultat
+     */
+    updatePassword: async (id, newPassword, callback) => {
+        try {
+            const hashedPassword = await generatePasswordHash(newPassword);
+            const query = 'UPDATE users SET password = ? WHERE id = ?';
+            
+            if (typeof callback === 'function') {
+                connection.query(query, [hashedPassword, id], callback);
+            } else {
+                throw new TypeError('Callback manquant ou invalide dans la méthode updatePassword.');
+            }
+        } catch (error) {
+            if (typeof callback === 'function') {
+                callback(error);
+            } else {
+                throw error;
+            }
+        }
+    },
+
+    /**
+     * @function updateEmail
+     * @description Fonction spécifique pour mettre à jour l'email d'un utilisateur
+     * @param {number} id - ID de l'utilisateur
+     * @param {string} email - Nouvel email
+     * @param {function} callback - Fonction de callback pour gérer le résultat
+     */
+    updateEmail: (id, email, callback) => {
+        if (typeof callback !== 'function') {
+            throw new TypeError('Callback manquant ou invalide dans la méthode updateEmail.');
+        }
+
+        const query = 'UPDATE users SET email = ? WHERE id = ?';
+        connection.query(query, [email, id], callback);
     },
 
     /**
