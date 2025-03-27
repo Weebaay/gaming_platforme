@@ -5,7 +5,6 @@
 
 require('dotenv').config();
 
-
 const express = require('express');
 const cors = require('cors');
 const swaggerJsDoc = require('swagger-jsdoc');
@@ -17,38 +16,22 @@ const http = require('http');
 const configureWebSockets = require('./routes/WebSocket'); // Importe la configuration WebSocket
 const { startPeriodicCleaning } = require('./cron/sessionCleaner'); // Importe le nettoyeur de sessions
 const { globalLimiter } = require('./middlewares/rateLimiter'); // Importe le limiteur global
-
+const { sessionConfig, sessionStoreConfig, corsConfig } = require('./config/security');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const sessionStore = new MySQLStore({
-    host: process.env.DATABASE_HOST,
-    user: process.env.DATABASE_USER,
-    password: process.env.DATABASE_PASSWORD,
-    database: process.env.DATABASE_NAME,
-});
+// Initialisation du store de session avec la configuration sécurisée
+const sessionStore = new MySQLStore(sessionStoreConfig);
 
-app.use(
-    sessions({
-        key: 'session_cookie_name',
-        secret: process.env.JWT_SECRET,
-        store: sessionStore,
-        resave: false,
-        saveUninitialized: false,
-        cookie: {
-            maxAge: 1000 * 60 * 60,
-            httpOnly: true,
-        },
-    })
-);
-
-app.use(cors({
-    origin: 'http://localhost:8080',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+// Configuration des sessions avec les paramètres sécurisés
+app.use(sessions({
+    ...sessionConfig,
+    store: sessionStore
 }));
+
+// Configuration CORS sécurisée
+app.use(cors(corsConfig));
 
 app.use(express.json());
 

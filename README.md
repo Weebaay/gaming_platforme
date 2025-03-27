@@ -4,24 +4,58 @@ Une plateforme de jeux moderne et interactive développée avec Vue.js, offrant 
 
 ## 🎮 Fonctionnalités
 
-- **Système d'Authentification**
-  - Inscription et connexion des utilisateurs
-  - Gestion des sessions avec JWT
+### 🔐 Système d'Authentification
+- Inscription sécurisée avec validation en temps réel
+- Connexion des utilisateurs avec JWT
+- Récupération de mot de passe par email
+- Gestion des sessions sécurisées
 
-- **Jeux Disponibles**
-  - 🎲 Jeu des Dés (mode solo, multijoueur et local)
-  - ⭕ Morpion (mode solo contre IA, multijoueur et local)
-  - ✌️ Pierre-Feuille-Ciseaux (contre l'IA)
+### 🎲 Jeux Disponibles
+- **Jeu des Dés**
+  - Mode solo contre l'IA
+  - Mode multijoueur en ligne
+  - Mode multijoueur local
+  
+- **Morpion**
+  - Mode solo contre IA adaptative
+  - Mode multijoueur en ligne
+  - Mode multijoueur local
+  
+- **Pierre-Feuille-Ciseaux**
+  - Mode solo contre IA
+  - Mode multijoueur en ligne
+  - Animations fluides des choix
 
-- **Fonctionnalités Sociales**
-  - 🏆 Classement des joueurs
-  - 📊 Statistiques par jeu
-  - 🎯 Suivi des victoires/défaites/égalités
+### 🏆 Système de Classement Avancé
+- **Tableau de classement interactif**
+  - Podium visuel des 3 meilleurs joueurs
+  - Recherche de joueurs en temps réel
+  - Filtrage par type de jeu
+  - Tri personnalisable (victoires, ratio)
+  
+- **Statistiques détaillées**
+  - Barres de progression visuelles
+  - Ratio victoires/défaites par jeu
+  - Suivi des performances en temps réel
+  - Mise en évidence du joueur actuel
 
-- **Interface Utilisateur**
-  - Design moderne avec thème cyberpunk
-  - Animations fluides et effets néon
-  - Interface responsive
+### 🎯 Fonctionnalités Sociales
+- Classement global et par jeu
+- Statistiques détaillées des joueurs
+- Suivi des performances personnelles
+- Historique des parties
+
+### 💫 Interface Utilisateur
+- **Design Moderne**
+  - Thème cyberpunk avec effets néon
+  - Animations fluides et réactives
+  - Interface adaptative (responsive)
+  
+- **Expérience Utilisateur**
+  - Navigation intuitive
+  - Feedback visuel des actions
+  - Messages d'aide contextuels
+  - Indicateurs de chargement animés
 
 ## 🛠️ Technologies Utilisées
 
@@ -120,16 +154,43 @@ npm install
 - Ajouter les variables d'environnement nécessaires :
 ```env
 VUE_APP_API_URL=http://localhost:3000
+VUE_APP_SOCKET_URL=http://localhost:3000
+VUE_APP_GAME_REFRESH_RATE=1000
 ```
 
 - Créer un fichier `.env` à la racine du dossier Backend
 - Ajouter les variables d'environnement nécessaires :
 ```env
+# Configuration de la base de données
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=votre_mot_de_passe
 DB_NAME=db_gamming
+
+# Configuration de sécurité
 JWT_SECRET=votre_clé_secrète
+JWT_EXPIRATION=24h
+REFRESH_TOKEN_SECRET=votre_clé_secrète_refresh
+REFRESH_TOKEN_EXPIRATION=7d
+
+# Configuration du serveur
+PORT=3000
+NODE_ENV=development
+
+# Configuration des emails
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=votre_email@gmail.com
+SMTP_PASS=votre_mot_de_passe_app
+EMAIL_FROM=HolberGames <votre_email@gmail.com>
+
+# Configuration des limites de requêtes
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Configuration du jeu
+GAME_SESSION_TIMEOUT=300000
+MATCHMAKING_TIMEOUT=30000
 ```
 
 6. **Lancer l'application**

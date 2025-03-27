@@ -8,6 +8,8 @@ import Home from '../components/Home.vue';
 import Auth from '../components/Auth.vue';
 import Register from '../components/Register.vue';
 import Login from '../components/Login.vue';
+import ForgotPassword from '../components/ForgotPassword.vue';
+import ResetPassword from '../components/ResetPassword.vue';
 import Morpion from '../components/Morpion.vue';
 import PierreFeuilleCiseaux from '../components/PierreFeuilleCiseaux.vue';
 import JeuDesDes from '../components/JeuDesDes.vue';
@@ -23,49 +25,61 @@ const routes = [
     path: '/',
     name: 'Auth',
     component: Auth,
-    meta: { description: 'Page d’authentification avec choix entre inscription et connexion.' },
+    meta: { description: "Page d'authentification avec choix entre inscription et connexion." },
   },
   {
     path: '/register',
     name: 'Register',
     component: Register,
-    meta: { description: 'Page pour créer un nouveau compte utilisateur.' },
+    meta: { description: "Page pour créer un nouveau compte utilisateur." },
   },
   {
     path: '/login',
     name: 'Login',
     component: Login,
-    meta: { description: 'Page pour se connecter à la plateforme.' },
+    meta: { description: "Page pour se connecter à la plateforme." },
+  },
+  {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: ForgotPassword,
+    meta: { description: "Page pour demander une réinitialisation de mot de passe." },
+  },
+  {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: ResetPassword,
+    meta: { description: "Page pour réinitialiser le mot de passe avec un jeton." },
   },
   {
     path: '/home',
     name: 'Home',
     component: Home,
-    meta: { description: 'Page d’accueil avec des liens vers les jeux.' },
+    meta: { description: "Page d'accueil avec des liens vers les jeux." },
   },
   {
     path: '/leaderboard',
     name: 'PlayerLeaderboard',
     component: Leaderboard,
-    meta: { description: 'Page du classement des joueurs' },
+    meta: { description: "Page du classement des joueurs" },
   },
   {
     path: '/game/morpion',
     name: 'MorpionGame',
     component: Morpion,
-    meta: { description: 'Composant du jeu Morpion.' },
+    meta: { description: "Composant du jeu Morpion." },
   },
   {
     path: '/game/pierre-feuille-ciseaux',
     name: 'PierreFeuilleCiseaux',
     component: PierreFeuilleCiseaux,
-    meta: { description: 'Composant du jeu Pierre-Feuille-Ciseaux.' },
+    meta: { description: "Composant du jeu Pierre-Feuille-Ciseaux." },
   },
   {
     path: '/game/jeu-des-des',
     name: 'JeuDesDes',
     component: JeuDesDes,
-    meta: { description: 'Composant du jeu des dés.' },
+    meta: { description: "Composant du jeu des dés." },
   },
 ];
 

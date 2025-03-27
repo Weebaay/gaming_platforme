@@ -7,7 +7,18 @@ const ResetToken = require('../models/resetToken'); // Importer le modèle des j
 const { handleDBError } = require('../db');
 const { loginLimiter } = require('../middlewares/rateLimiter'); // Importer le middleware de limitation
 const { sendPasswordResetEmail } = require('../services/emailService'); // Importer le service d'email
-const { createRateLimiter } = require('../middlewares/rateLimiter'); // Pour créer un limiteur personnalisé
+const emailService = require('../services/emailService'); // Ajout de l'import complet
+const { createRateLimiter } = require('../middlewares/rateLimiter');
+const { jwtConfig } = require('../config/security');
+const validateRequest = require('../middlewares/validateRequest');
+const { 
+    validateRegister,
+    validateLogin,
+    validateForgotPassword,
+    validateResetPassword,
+    validateVerifyResetToken,
+    validateUpdateProfile
+} = require('../validators/userValidator');
 
 // Limiteur spécifique pour les demandes de réinitialisation de mot de passe
 const resetLimiter = createRateLimiter({
@@ -37,31 +48,37 @@ const resetLimiter = createRateLimiter({
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - username
+ *               - password
+ *               - confirmPassword
  *             properties:
  *               username:
  *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 30
+ *                 pattern: ^[a-zA-Z0-9_-]+$
  *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 description: Doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial
+ *               confirmPassword:
  *                 type: string
  *               email:
  *                 type: string
+ *                 format: email
  *     responses:
  *       201:
  *         description: Utilisateur inscrit avec succès
  *       400:
- *         description: Nom d'utilisateur déjà utilisé
+ *         description: Erreur de validation ou nom d'utilisateur déjà utilisé
  *       500:
  *         description: Erreur lors de l'inscription
  */
-router.post('/register', async (req, res) => {
-    console.log('POST /api/register appelé');
+router.post('/register', validateRequest(validateRegister), async (req, res) => {
     const { username, password, email } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Nom d\'utilisateur ou mot de passe manquant' });
-    }
-
     try {
-        // Appel de getByUsername avec un callback valide
         User.getByUsername(username, async (err, existingUser) => {
             if (err) {
                 console.error('Erreur base de données :', err);
@@ -72,34 +89,22 @@ router.post('/register', async (req, res) => {
                 return res.status(400).json({ error: 'Nom d\'utilisateur déjà utilisé' });
             }
 
-            // Vérifier si l'email est déjà utilisé (si fourni)
             if (email) {
                 User.getByEmail(email, (err, existingUserEmail) => {
-                    if (err) {
-                        return handleDBError(err, res);
-                    }
-
+                    if (err) return handleDBError(err, res);
                     if (existingUserEmail) {
                         return res.status(400).json({ error: 'Email déjà utilisé' });
                     }
 
-                    // Création d'un nouvel utilisateur avec email
                     User.create({ username, password, email }, (err) => {
-                        if (err) {
-                            return handleDBError(err, res);
-                        }
-
+                        if (err) return handleDBError(err, res);
                         console.log(`Utilisateur enregistré : ${username} avec email: ${email}`);
                         res.status(201).json({ message: 'Utilisateur inscrit avec succès' });
                     });
                 });
             } else {
-                // Création d'un nouvel utilisateur sans email
                 User.create({ username, password }, (err) => {
-                    if (err) {
-                        return handleDBError(err, res);
-                    }
-
+                    if (err) return handleDBError(err, res);
                     console.log(`Utilisateur enregistré : ${username}`);
                     res.status(201).json({ message: 'Utilisateur inscrit avec succès' });
                 });
@@ -123,6 +128,9 @@ router.post('/register', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - username
+ *               - password
  *             properties:
  *               username:
  *                 type: string
@@ -131,28 +139,19 @@ router.post('/register', async (req, res) => {
  *     responses:
  *       200:
  *         description: Connexion réussie
+ *       400:
+ *         description: Erreur de validation
  *       401:
  *         description: Identifiants incorrects
  *       429:
- *         description: Trop de tentatives, veuillez réessayer plus tard
- *       500:
- *         description: Erreur lors de la connexion
+ *         description: Trop de tentatives
  */
-router.post('/login', loginLimiter, async (req, res) => {
-    console.log("Tentative de connexion avec:", req.body);
+router.post('/login', loginLimiter, validateRequest(validateLogin), async (req, res) => {
     const { username, password } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Nom d\'utilisateur ou mot de passe manquant' });
-    }
-
     try {
-        // Appel de getByUsername avec un callback valide
         User.getByUsername(username, async (err, user) => {
-            if (err) {
-                return handleDBError(err, res);
-            }
-
+            if (err) return handleDBError(err, res);
             if (!user) {
                 return res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
             }
@@ -162,15 +161,30 @@ router.post('/login', loginLimiter, async (req, res) => {
                 return res.status(401).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
             }
 
-            // Génération du token JWT
             const token = jwt.sign(
-                { userId: user.id, username: user.username, role: user.role },
-                process.env.JWT_SECRET,
-                { expiresIn: '24h' }
+                { 
+                    userId: user.id, 
+                    username: user.username, 
+                    role: user.role 
+                },
+                jwtConfig.secret,
+                {
+                    ...jwtConfig.options,
+                    subject: user.id.toString()
+                }
             );
 
             console.log('Utilisateur connecté avec succès :', username);
-            res.status(200).json({ message: 'Connexion réussie', token });
+            res.status(200).json({ 
+                message: 'Connexion réussie', 
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    email: user.email
+                }
+            });
         });
     } catch (error) {
         handleDBError(error, res);
@@ -189,49 +203,35 @@ router.post('/login', loginLimiter, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
  *             properties:
  *               email:
  *                 type: string
- *     responses:
- *       200:
- *         description: Email de réinitialisation envoyé (toujours retourné pour des raisons de sécurité)
- *       429:
- *         description: Trop de tentatives, veuillez réessayer plus tard
- *       500:
- *         description: Erreur lors de l'envoi de l'email
+ *                 format: email
  */
-router.post('/forgot-password', resetLimiter, async (req, res) => {
+router.post('/forgot-password', resetLimiter, validateRequest(validateForgotPassword), async (req, res) => {
     const { email } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ error: 'Email manquant' });
-    }
-
     try {
-        // Rechercher l'utilisateur par email
         User.getByEmail(email, (err, user) => {
             if (err) {
-                console.error('Erreur lors de la recherche de l\'utilisateur par email:', err);
+                console.error('Erreur lors de la recherche de l\'utilisateur:', err);
                 return handleDBError(err, res);
             }
 
-            // Pour des raisons de sécurité, nous renvoyons toujours un message de succès
-            // même si l'email n'existe pas
             if (!user) {
-                console.log(`Tentative de réinitialisation pour un email non existant: ${email}`);
                 return res.status(200).json({ 
                     message: 'Si cet email est associé à un compte, un lien de réinitialisation a été envoyé.' 
                 });
             }
 
-            // Créer un jeton de réinitialisation
             ResetToken.create(user.id, (err, token) => {
                 if (err) {
-                    console.error('Erreur lors de la création du jeton de réinitialisation:', err);
+                    console.error('Erreur lors de la création du token:', err);
                     return handleDBError(err, res);
                 }
 
-                // Envoyer l'email de réinitialisation
                 sendPasswordResetEmail(email, user.username, token)
                     .then(() => {
                         console.log(`Email de réinitialisation envoyé à: ${email}`);
@@ -241,7 +241,7 @@ router.post('/forgot-password', resetLimiter, async (req, res) => {
                     })
                     .catch(error => {
                         console.error('Erreur lors de l\'envoi de l\'email:', error);
-                        res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email de réinitialisation' });
+                        res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email' });
                     });
             });
         });
@@ -255,49 +255,39 @@ router.post('/forgot-password', resetLimiter, async (req, res) => {
  * @swagger
  * /api/users/verify-reset-token:
  *   post:
- *     summary: Vérifier la validité d'un jeton de réinitialisation
  *     tags: [Users]
+ *     summary: Vérifie la validité d'un token de réinitialisation
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - token
  *             properties:
  *               token:
  *                 type: string
+ *                 description: Token de réinitialisation
  *     responses:
  *       200:
- *         description: Jeton valide
+ *         description: Token valide
  *       400:
- *         description: Jeton manquant
- *       401:
- *         description: Jeton invalide ou expiré
- *       500:
- *         description: Erreur lors de la vérification du jeton
+ *         description: Token invalide ou expiré
  */
-router.post('/verify-reset-token', async (req, res) => {
-    const { token } = req.body;
-
-    if (!token) {
-        return res.status(400).json({ error: 'Jeton manquant' });
-    }
-
+router.post('/verify-reset-token', validateRequest(validateVerifyResetToken), async (req, res) => {
     try {
-        ResetToken.verify(token, (err, userId) => {
-            if (err) {
-                return handleDBError(err, res);
-            }
-
-            if (!userId) {
-                return res.status(401).json({ error: 'Jeton invalide ou expiré' });
-            }
-
-            res.status(200).json({ valid: true });
-        });
+        const { token } = req.body;
+        const isValid = await emailService.verifyPasswordResetToken(token);
+        
+        if (!isValid) {
+            return res.status(400).json({ message: 'Token invalide ou expiré' });
+        }
+        
+        res.json({ message: 'Token valide' });
     } catch (error) {
-        console.error('Erreur dans /verify-reset-token:', error);
-        res.status(500).json({ error: 'Erreur interne du serveur' });
+        console.error('Erreur lors de la vérification du token:', error);
+        res.status(500).json({ message: 'Erreur lors de la vérification du token' });
     }
 });
 
@@ -305,7 +295,7 @@ router.post('/verify-reset-token', async (req, res) => {
  * @swagger
  * /api/users/reset-password:
  *   post:
- *     summary: Réinitialiser le mot de passe avec un jeton valide
+ *     summary: Réinitialiser le mot de passe
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -313,62 +303,41 @@ router.post('/verify-reset-token', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - token
+ *               - password
+ *               - confirmPassword
  *             properties:
  *               token:
  *                 type: string
- *               newPassword:
+ *               password:
  *                 type: string
- *     responses:
- *       200:
- *         description: Mot de passe réinitialisé avec succès
- *       400:
- *         description: Données manquantes
- *       401:
- *         description: Jeton invalide ou expiré
- *       500:
- *         description: Erreur lors de la réinitialisation du mot de passe
+ *                 minLength: 8
+ *               confirmPassword:
+ *                 type: string
  */
-router.post('/reset-password', async (req, res) => {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword) {
-        return res.status(400).json({ error: 'Jeton ou nouveau mot de passe manquant' });
-    }
+router.post('/reset-password', validateRequest(validateResetPassword), async (req, res) => {
+    const { token, password } = req.body;
 
     try {
-        // Vérifier si le jeton est valide
         ResetToken.verify(token, (err, userId) => {
-            if (err) {
-                return handleDBError(err, res);
-            }
-
+            if (err) return handleDBError(err, res);
             if (!userId) {
                 return res.status(401).json({ error: 'Jeton invalide ou expiré' });
             }
 
-            // Mettre à jour le mot de passe de l'utilisateur
-            User.updatePassword(userId, newPassword, (err) => {
-                if (err) {
-                    return handleDBError(err, res);
-                }
+            User.updatePassword(userId, password, (err) => {
+                if (err) return handleDBError(err, res);
 
-                // Supprimer le jeton utilisé
                 ResetToken.delete(token, (err) => {
-                    if (err) {
-                        console.error('Erreur lors de la suppression du jeton:', err);
-                        // Continuer même si la suppression échoue
-                    }
-
-                    // Nettoyer les jetons expirés
-                    ResetToken.cleanExpired((err) => {
-                        if (err) {
-                            console.error('Erreur lors du nettoyage des jetons expirés:', err);
-                            // Continuer même si le nettoyage échoue
-                        }
-
-                        res.status(200).json({ message: 'Mot de passe réinitialisé avec succès' });
-                    });
+                    if (err) console.error('Erreur lors de la suppression du token:', err);
                 });
+
+                ResetToken.cleanExpired((err) => {
+                    if (err) console.error('Erreur lors du nettoyage des tokens:', err);
+                });
+
+                res.status(200).json({ message: 'Mot de passe réinitialisé avec succès' });
             });
         });
     } catch (error) {

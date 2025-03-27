@@ -6,6 +6,9 @@
     </nav>
     <div class="login">
       <h2>Connexion</h2>
+      <div v-if="registrationSuccess" class="success-message">
+        Inscription réussie ! Vous pouvez maintenant vous connecter.
+      </div>
       <form @submit.prevent="handleLogin">
         <div class="form-group">
           <label for="username">Nom d'utilisateur</label>
@@ -25,32 +28,60 @@
             required
           />
         </div>
-        <button type="submit">Se connecter</button>
+        <div class="form-actions">
+          <router-link to="/forgot-password" class="forgot-password-link">
+            Mot de passe oublié ?
+          </router-link>
+          <button type="submit" :disabled="isLoading">
+            {{ isLoading ? 'Connexion en cours...' : 'Se connecter' }}
+          </button>
+        </div>
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
       </form>
+      <div class="register-link">
+        Vous n'avez pas de compte ? <router-link to="/register">Inscrivez-vous</router-link>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import api from '../services/api';
 
 export default {
   name: "LoginPage",
   setup() {
+    const route = useRoute();
+    const router = useRouter();
     const username = ref('');
     const password = ref('');
-    const router = useRouter();
+    const errorMessage = ref('');
+    const isLoading = ref(false);
+    const registrationSuccess = ref(false);
+
+    // Vérifier si l'utilisateur vient de s'inscrire
+    onMounted(() => {
+      if (route.query.registered === 'success') {
+        registrationSuccess.value = true;
+      }
+    });
 
     const handleLogin = async () => {
       // Validation des champs
       if (!username.value.trim() || !password.value.trim()) {
-        alert('Veuillez remplir tous les champs');
+        errorMessage.value = 'Veuillez remplir tous les champs';
         return;
       }
 
       try {
+        isLoading.value = true;
+        errorMessage.value = '';
+        registrationSuccess.value = false; // Cacher le message de succès
+        
         console.log("Tentative de connexion avec :", { username: username.value, password: password.value });
         const response = await api.post('/users/login', { 
           username: username.value.trim(), 
@@ -59,17 +90,27 @@ export default {
         console.log("Nom d'utilisateur stocké :", username.value);
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('username', username.value);
-        alert("Connexion réussie !");
         router.push('/home');
       } catch (error) {
         console.error("Erreur de connexion :", error.response || error);
-        alert("Erreur de connexion. Réessayez.");
+        if (error.response && error.response.status === 401) {
+          errorMessage.value = "Nom d'utilisateur ou mot de passe incorrect.";
+        } else if (error.response && error.response.status === 429) {
+          errorMessage.value = "Trop de tentatives. Veuillez réessayer plus tard.";
+        } else {
+          errorMessage.value = "Une erreur est survenue. Veuillez réessayer.";
+        }
+      } finally {
+        isLoading.value = false;
       }
     };
 
     return {
       username,
       password,
+      errorMessage,
+      isLoading,
+      registrationSuccess,
       handleLogin
     };
   }
@@ -177,6 +218,61 @@ input:focus {
   box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
 }
 
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.forgot-password-link {
+  font-size: 0.9rem;
+  color: #8a2be2;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
+  color: #00bfff;
+}
+
+.register-link {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.register-link a {
+  color: #8a2be2;
+  text-decoration: none;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+  color: #00bfff;
+}
+
+.error-message {
+  margin-top: 1rem;
+  color: #e74c3c;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.success-message {
+  margin-bottom: 1.5rem;
+  padding: 0.8rem;
+  background-color: rgba(46, 204, 113, 0.2);
+  border: 1px solid #2ecc71;
+  border-radius: 5px;
+  color: #2ecc71;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 button {
   padding: 0.8rem 1.8rem;
   font-size: 1rem;
@@ -194,7 +290,7 @@ button {
     0 0 20px rgba(0, 191, 255, 0.3);
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background: linear-gradient(90deg, 
     #00bfff 0%,
     #00ff9d 100%
@@ -203,6 +299,12 @@ button:hover {
   box-shadow: 
     0 0 15px rgba(0, 191, 255, 0.7),
     0 0 25px rgba(0, 255, 157, 0.5);
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .home-link {
