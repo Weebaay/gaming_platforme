@@ -51,6 +51,22 @@
           <p>Tentez votre chance aux dés !</p>
         </div>
       </router-link>
+
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-trophy"></i></div>
+        <div class="feature-content">
+          <h3>Classement</h3>
+          <p>Découvrez le classement des joueurs et comparez vos performances</p>
+          <div class="feature-links">
+            <router-link to="/leaderboard" class="feature-link">
+              <i class="fas fa-robot"></i> Classement IA
+            </router-link>
+            <router-link to="/leaderboard-online" class="feature-link">
+              <i class="fas fa-users"></i> Classement Multijoueur
+            </router-link>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -72,7 +88,7 @@ export default {
     };
 
     const goToRanking = () => {
-      router.push('/leaderboard');
+      router.push('/leaderboard-online');
     };
 
     return {

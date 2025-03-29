@@ -9,21 +9,41 @@ config.global.mocks = {
   })
 };
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn()
-};
-global.localStorage = localStorageMock;
+// Mock localStorage de manière plus complète
+const localStorageMock = (() => {
+  let store = {};
+  return {
+    getItem: jest.fn(key => store[key] || null),
+    setItem: jest.fn((key, value) => {
+      store[key] = String(value);
+    }),
+    removeItem: jest.fn(key => {
+      delete store[key];
+    }),
+    clear: jest.fn(() => {
+      store = {};
+    }),
+    key: jest.fn(index => {
+      return Object.keys(store)[index] || null;
+    }),
+    length: jest.fn(() => Object.keys(store).length)
+  };
+})();
 
-// Mock alert
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true
+});
+
+// Mock pour les alertes et confirmations
 global.alert = jest.fn();
+global.confirm = jest.fn(() => true);
 
-// Mock console methods
+// Mock des fonctions console
 global.console = {
   log: jest.fn(),
   error: jest.fn(),
-  warn: jest.fn()
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn()
 }; 

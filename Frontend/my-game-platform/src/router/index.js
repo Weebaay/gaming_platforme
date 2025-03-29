@@ -13,7 +13,8 @@ import ResetPassword from '../components/ResetPassword.vue';
 import Morpion from '../components/Morpion.vue';
 import PierreFeuilleCiseaux from '../components/PierreFeuilleCiseaux.vue';
 import JeuDesDes from '../components/JeuDesDes.vue';
-import Leaderboard from '@/components/Leaderboard.vue';
+import Leaderboard from '../components/Leaderboard.vue';
+import LeaderboardOnline from '../components/LeaderboardOnline.vue';
 
 // Fonction pour vérifier si l'utilisateur est connecté
 function isAuthenticated() {
@@ -59,9 +60,15 @@ const routes = [
   },
   {
     path: '/leaderboard',
-    name: 'PlayerLeaderboard',
+    name: 'Leaderboard',
     component: Leaderboard,
-    meta: { description: "Page du classement des joueurs" },
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/leaderboard-online',
+    name: 'LeaderboardOnline',
+    component: LeaderboardOnline,
+    meta: { requiresAuth: true }
   },
   {
     path: '/game/morpion',

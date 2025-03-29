@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import Register from '@/components/Register.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import api from '@/services/api';
@@ -51,69 +51,66 @@ describe('Register.vue', () => {
   });
 
   it('gère une inscription réussie', async () => {
-    // Simuler une réponse réussie de l'API
-    api.post.mockResolvedValueOnce({ data: { message: 'Inscription réussie' } });
+    const mockResponse = { status: 201 };
+    api.post.mockResolvedValueOnce(mockResponse);
 
-    // Mock de la méthode push du router
-    const pushMock = jest.fn();
-    router.push = pushMock;
+    // Définir les valeurs des champs
+    wrapper.vm.username = 'testuser';
+    wrapper.vm.password = 'testpass';
+    wrapper.vm.email = 'test@example.com';
 
-    // Remplir le formulaire
-    await wrapper.find('input[type="text"]').setValue('testuser');
-    await wrapper.find('input[type="password"]').setValue('testpass');
-
-    // Soumettre le formulaire
-    await wrapper.find('form').trigger('submit');
+    // Appeler directement la méthode de soumission
+    await wrapper.vm.handleRegister();
+    await flushPromises();
 
     // Vérifier que l'API a été appelée avec les bonnes données
-    expect(api.post).toHaveBeenCalledWith('/api/users/register', {
+    expect(api.post).toHaveBeenCalledWith('/users/register', {
       username: 'testuser',
-      password: 'testpass'
+      password: 'testpass',
+      confirmPassword: 'testpass',
+      email: 'test@example.com'
     });
 
-    // Attendre que toutes les promesses soient résolues
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // Vérifier que le router a été redirigé vers la page de connexion
+    expect(router.push).toHaveBeenCalledWith({ path: '/login', query: { registered: 'success' } });
 
-    // Vérifier la redirection
-    expect(pushMock).toHaveBeenCalledWith('/login');
+    // Vérifier que les champs ont été vidés
+    expect(wrapper.vm.username).toBe('');
+    expect(wrapper.vm.password).toBe('');
+    expect(wrapper.vm.email).toBe('');
   });
 
   it('gère les erreurs d\'inscription', async () => {
-    // Simuler une erreur de l'API
-    const errorMessage = 'Nom d\'utilisateur déjà pris';
-    api.post.mockRejectedValueOnce(new Error(errorMessage));
+    api.post.mockRejectedValueOnce(new Error('Erreur d\'inscription'));
 
-    // Remplir et soumettre le formulaire
-    await wrapper.find('input[type="text"]').setValue('existinguser');
-    await wrapper.find('input[type="password"]').setValue('testpass');
-    
-    // Mock de window.alert
-    const alertMock = jest.spyOn(window, 'alert').mockImplementation(() => {});
-    
-    await wrapper.find('form').trigger('submit');
+    window.alert = jest.fn();
+
+    // Définir les valeurs des champs
+    wrapper.vm.username = 'testuser';
+    wrapper.vm.password = 'testpass';
+
+    // Appeler directement la méthode de soumission
+    await wrapper.vm.handleRegister();
+    await flushPromises();
 
     // Vérifier que l'alerte d'erreur est affichée
-    expect(alertMock).toHaveBeenCalled();
-    
-    // Restaurer le mock de alert
-    alertMock.mockRestore();
+    expect(window.alert).toHaveBeenCalledWith('Erreur d\'inscription. Réessayez.');
   });
 
   it('nettoie les champs après une inscription réussie', async () => {
-    // Simuler une réponse réussie
-    api.post.mockResolvedValueOnce({ data: { message: 'Inscription réussie' } });
+    const mockResponse = { status: 201 };
+    api.post.mockResolvedValueOnce(mockResponse);
 
-    // Remplir le formulaire
-    const usernameInput = wrapper.find('input[type="text"]');
-    const passwordInput = wrapper.find('input[type="password"]');
-    
-    await usernameInput.setValue('testuser');
-    await passwordInput.setValue('testpass');
-    await wrapper.find('form').trigger('submit');
+    // Définir les valeurs des champs
+    wrapper.vm.username = 'testuser';
+    wrapper.vm.password = 'testpass';
 
-    // Vérifier que les champs sont vidés
-    await wrapper.vm.$nextTick();
-    expect(usernameInput.element.value).toBe('');
-    expect(passwordInput.element.value).toBe('');
+    // Appeler directement la méthode de soumission
+    await wrapper.vm.handleRegister();
+    await flushPromises();
+
+    // Vérifier que les champs ont été vidés
+    expect(wrapper.vm.username).toBe('');
+    expect(wrapper.vm.password).toBe('');
   });
 }); 

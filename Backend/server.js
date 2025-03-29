@@ -44,12 +44,16 @@ const userRoutes = require('./routes/users');
 const gameSessionRoutes = require('./routes/gameSessions');
 const leaderboardRoutes = require('./routes/leaderboard');
 const progress = require('./routes/progress');
+const multiplayerMatchesRoutes = require('./routes/multiplayerMatches');
+const multiplayerLeaderboardRoutes = require('./routes/multiplayerLeaderboard');
 
 app.use('/api/games', gameRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/game-sessions', gameSessionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/progress', progress);
+app.use('/api/multiplayer', multiplayerMatchesRoutes);
+app.use('/api/leaderboard/multiplayer', multiplayerLeaderboardRoutes);
 
 const swaggerOptions = {
     definition: {

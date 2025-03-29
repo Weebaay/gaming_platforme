@@ -5,6 +5,10 @@
                 <i class="fas fa-home"></i> Accueil
             </router-link>
             <h1>Classement des Joueurs</h1>
+            <div class="mode-selector">
+                <router-link to="/leaderboard" class="mode-link active">Mode IA</router-link>
+                <router-link to="/leaderboard-online" class="mode-link">Mode Multijoueur</router-link>
+            </div>
             <div class="refresh-button">
                 <button @click="fetchLeaderboard" :class="{ 'refreshing': isRefreshing }">
                     <i class="fas fa-sync-alt"></i> Actualiser
@@ -475,5 +479,23 @@ tr:hover {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
     margin-top: 2rem;
+}
+
+.mode-selector {
+    display: flex;
+    gap: 10px;
+}
+
+.mode-link {
+    padding: 8px 15px;
+    border-radius: 5px;
+    color: white;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.mode-link.active, .mode-link:hover {
+    background: rgba(81, 98, 231, 0.6);
 }
 </style>
