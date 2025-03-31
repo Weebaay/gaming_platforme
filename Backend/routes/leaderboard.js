@@ -43,4 +43,68 @@ router.get('/', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /api/leaderboard/multiplayer:
+ *   get:
+ *     summary: Récupère le classement multijoueur
+ *     tags: [Leaderboard]
+ *     parameters:
+ *       - in: query
+ *         name: game_name
+ *         schema:
+ *           type: string
+ *         description: Filtrer par nom de jeu
+ *     responses:
+ *       200:
+ *         description: Classement multijoueur
+ *       500:
+ *         description: Erreur serveur
+ */
+router.get('/multiplayer', (req, res) => {
+    const gameName = req.query.game_name;
+    console.log(`Requête GET /api/leaderboard/multiplayer reçue (filtre jeu: ${gameName || 'aucun'})`);
+    
+    const query = `
+        SELECT 
+            u.id AS user_id,
+            u.username,
+            ms.matches_played,
+            ms.victories,
+            ms.defeats,
+            ms.draws,
+            ms.points,
+             -- Calculer le win_rate, éviter division par zéro
+            CASE 
+                WHEN (ms.victories + ms.defeats) = 0 THEN 0
+                ELSE ROUND((ms.victories / (ms.victories + ms.defeats)) * 100, 2) 
+            END AS win_rate
+        FROM multiplayer_stats ms
+        JOIN users u ON ms.player_id = u.id
+        ${gameName ? 'WHERE ms.game_name = ?' : ''}
+        ORDER BY ms.points DESC, ms.victories DESC;
+    `;
+
+    const queryParams = [];
+    if (gameName) {
+        queryParams.push(gameName);
+    }
+
+    connection.query(query, queryParams, (err, results) => {
+        if (err) {
+            console.error("Erreur SQL leaderboard multijoueur:", err);
+            return handleDBError(err, res);
+        }
+        
+        // Ajouter le rang
+        const rankedResults = results.map((player, index) => ({
+            ...player,
+            rank: index + 1
+        }));
+        
+        console.log(`Envoi de ${rankedResults.length} résultats pour le leaderboard multijoueur.`);
+        res.status(200).json(rankedResults);
+    });
+});
+
 module.exports = router;

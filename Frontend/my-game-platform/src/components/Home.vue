@@ -1,5 +1,5 @@
 <template>
-  <div class="home-container">
+  <div class="home-container" :style="{ backgroundImage: 'url(/images/hypocampNeon.avif)' }">
     <nav class="navbar">
       <div class="navbar-brand">HolberGames</div>
       <div class="navbar-items">
@@ -11,6 +11,10 @@
           <i class="fas fa-trophy"></i>
           Classement
         </button>
+        <button v-if="isAdmin" class="admin-btn" @click="goToAdmin">
+          <i class="fas fa-cog"></i>
+          Admin
+        </button>
         <button class="logout-btn" @click="handleLogout">
           <i class="fas fa-sign-out-alt"></i>
           Déconnexion
@@ -19,7 +23,7 @@
     </nav>
 
     <div class="center-content">
-      <h1 class="title">Bienvenue à Holber Games</h1>
+      <h1 class="title" data-text="Bienvenue à Holber Games">Bienvenue à Holber Games</h1>
       <p class="slogan">jouez partagez gagnez</p>
     </div>
 
@@ -72,7 +76,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 export default {
@@ -80,6 +84,19 @@ export default {
   setup() {
     const router = useRouter();
     const username = ref(localStorage.getItem('username') || '');
+    
+    const isAdmin = computed(() => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return false;
+        
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload && payload.role === 'ADMIN';
+      } catch (error) {
+        console.error('Erreur lors de la vérification du rôle admin:', error);
+        return false;
+      }
+    });
 
     const handleLogout = () => {
       localStorage.removeItem('token');
@@ -90,11 +107,17 @@ export default {
     const goToRanking = () => {
       router.push('/leaderboard-online');
     };
+    
+    const goToAdmin = () => {
+      router.push('/admin');
+    };
 
     return {
       username,
+      isAdmin,
       handleLogout,
-      goToRanking
+      goToRanking,
+      goToAdmin
     };
   }
 };
@@ -105,7 +128,9 @@ export default {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  background-color: #1a1a1a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .navbar {
@@ -221,23 +246,81 @@ export default {
 
 .title {
   font-size: 3.5rem;
-  color: #8a2be2;
+  background: linear-gradient(to right, 
+    #ff00ff, 
+    #00ffff, 
+    #ff00ff
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   margin-bottom: 1rem;
   text-shadow: 
-    0 0 5px rgba(138, 43, 226, 0.5),
-    0 0 10px rgba(0, 191, 255, 0.3),
-    0 0 15px rgba(0, 255, 157, 0.2);
+    0 0 5px rgba(255, 0, 255, 0.7),
+    0 0 10px rgba(0, 255, 255, 0.7),
+    0 0 20px rgba(255, 0, 255, 0.5);
+  font-weight: bold;
+  letter-spacing: 2px;
+  animation: neonPulse 2s infinite alternate;
+  position: relative;
+}
+
+.title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  filter: blur(15px);
+  opacity: 0.7;
 }
 
 .slogan {
   font-size: 1.8rem;
-  color: #00bfff;
+  font-weight: bold;
+  background: linear-gradient(to right, 
+    #fcee0c, 
+    #ff00ff, 
+    #00ffff
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   white-space: nowrap;
-  animation: scrollText 15s linear infinite;
+  animation: scrollText 15s linear infinite, neonFlicker 3s infinite alternate;
   text-shadow: 
-    0 0 10px rgba(0, 191, 255, 0.8),
-    0 0 20px rgba(0, 255, 157, 0.6),
-    0 0 30px rgba(138, 43, 226, 0.4);
+    0 0 10px rgba(252, 238, 12, 0.8),
+    0 0 20px rgba(255, 0, 255, 0.6),
+    0 0 30px rgba(0, 255, 255, 0.6);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+@keyframes neonPulse {
+  0% {
+    text-shadow: 
+      0 0 5px rgba(255, 0, 255, 0.7),
+      0 0 10px rgba(0, 255, 255, 0.7),
+      0 0 15px rgba(255, 0, 255, 0.5);
+  }
+  100% {
+    text-shadow: 
+      0 0 15px rgba(255, 0, 255, 0.9),
+      0 0 25px rgba(0, 255, 255, 0.9),
+      0 0 35px rgba(255, 0, 255, 0.7);
+  }
+}
+
+@keyframes neonFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    text-shadow: 
+      0 0 10px rgba(252, 238, 12, 0.8),
+      0 0 20px rgba(255, 0, 255, 0.6),
+      0 0 30px rgba(0, 255, 255, 0.6);
+  }
+  20%, 24%, 55% {
+    text-shadow: none;
+  }
 }
 
 @keyframes scrollText {
@@ -414,6 +497,34 @@ export default {
   .game-card {
     height: 250px;
   }
+}
+
+.admin-btn {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(90deg, 
+    rgba(255, 193, 7, 0.8) 0%,
+    rgba(255, 152, 0, 0.8) 100%
+  );
+}
+
+.admin-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(90deg, 
+    rgba(255, 152, 0, 0.8) 0%,
+    rgba(255, 87, 34, 0.8) 100%
+  );
+  box-shadow: 
+    0 0 10px rgba(255, 152, 0, 0.5),
+    0 0 15px rgba(255, 87, 34, 0.3);
 }
 </style>
   

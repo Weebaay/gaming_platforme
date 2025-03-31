@@ -77,11 +77,14 @@ router.post('/matches', verifyJWT, async (req, res) => {
         const updateStatsQuery = `CALL update_multiplayer_stats(?, ?, ?, ?, ?)`;
         const updateParams = [game_name, player1_id, player2_id, winner_id || null, result];
         
+        console.log("Appel de update_multiplayer_stats avec params:", updateParams);
+        
         connection.query(updateStatsQuery, updateParams, (statsErr) => {
             if (statsErr) {
-                console.error('Erreur lors de la mise à jour des statistiques multijoueur :', statsErr.message);
+                console.error('ERREUR lors de la mise à jour des statistiques multijoueur (CALL update_multiplayer_stats):', statsErr);
                 // On continue même en cas d'erreur de stats
             }
+            console.log("Mise à jour des stats multijoueur terminée (ou erreur logguée).");
             
             res.status(201).json({
                 message: 'Partie multijoueur enregistrée avec succès.',

@@ -17,6 +17,7 @@ const configureWebSockets = require('./routes/WebSocket'); // Importe la configu
 const { startPeriodicCleaning } = require('./cron/sessionCleaner'); // Importe le nettoyeur de sessions
 const { globalLimiter } = require('./middlewares/rateLimiter'); // Importe le limiteur global
 const { sessionConfig, sessionStoreConfig, corsConfig } = require('./config/security');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +55,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/progress', progress);
 app.use('/api/multiplayer', multiplayerMatchesRoutes);
 app.use('/api/leaderboard/multiplayer', multiplayerLeaderboardRoutes);
+app.use('/admin', adminRoutes);
 
 const swaggerOptions = {
     definition: {

@@ -5,11 +5,12 @@ const verifyJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log(`[ERROR] Token manquant ou format invalide`);
-        return res.status(401).json({ message: 'Token manquant ou invalide' });
+        console.log(`[ERROR] Token manquant ou format invalide: ${authHeader}`);
+        return res.status(401).json({ error: 'Authentification requise' });
     }
 
     const token = authHeader.split(' ')[1];
+    console.log(`[DEBUG] Token reçu: ${token.substring(0, 15)}...`);
 
     try {
         const decoded = jwt.verify(token, jwtConfig.secret, {
@@ -18,13 +19,13 @@ const verifyJWT = (req, res, next) => {
             audience: jwtConfig.options.audience
         });
 
-        console.log(`[INFO] Token décodé avec succès pour l'utilisateur : ${decoded.username}`);
+        console.log(`[INFO] Token décodé avec succès pour l'utilisateur : ${decoded.username}, rôle: ${decoded.role}`);
         req.user = decoded;
         next();
     } catch (err) {
         console.log(`[ERROR] Échec de vérification du token: ${err.message}`);
         return res.status(403).json({ 
-            message: 'Token invalide',
+            error: 'Token invalide',
             details: process.env.NODE_ENV === 'development' ? err.message : undefined 
         });
     }
